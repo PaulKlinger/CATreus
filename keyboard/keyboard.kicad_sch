@@ -3,7 +3,7 @@
 	(generator "eeschema")
 	(generator_version "9.0")
 	(uuid "14729fd7-986c-4efb-98d2-a3429ab7ca91")
-	(paper "A1")
+	(paper "A3")
 	(lib_symbols
 		(symbol "Battery_Management:DW01A"
 			(exclude_from_sim no)
@@ -8538,7 +8538,7 @@
 			)
 		)
 		(pin "1"
-			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce41")
+			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce42")
 		)
 		(instances
 			(project ""
@@ -10852,7 +10852,7 @@
 			)
 		)
 		(pin "1"
-			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce41")
+			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce43")
 		)
 		(instances
 			(project ""
@@ -11902,7 +11902,7 @@
 			)
 		)
 		(pin "1"
-			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce41")
+			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce44")
 		)
 		(instances
 			(project ""
@@ -13588,7 +13588,7 @@
 			)
 		)
 		(pin "1"
-			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce41")
+			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce45")
 		)
 		(instances
 			(project ""
@@ -17501,7 +17501,7 @@
 			)
 		)
 		(pin "1"
-			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce41")
+			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce46")
 		)
 		(instances
 			(project ""
@@ -17773,7 +17773,7 @@
 			)
 		)
 		(pin "1"
-			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce41")
+			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce47")
 		)
 		(instances
 			(project ""
@@ -19461,7 +19461,7 @@
 			)
 		)
 		(pin "1"
-			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce41")
+			(uuid "0c48adf0-d520-449b-981b-e48b2a98ce48")
 		)
 		(instances
 			(project ""
