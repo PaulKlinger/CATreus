@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"conn.h": "c",
+			"compare": "c",
+			"settings.h": "c",
+			"byteorder.h": "c",
+			"kernel.h": "c",
+			"xiosbase": "c",
+			"npm1300_charger.h": "c",
+			"i2c.h": "c",
+			"xutility": "c"
+		}
+	}
+}

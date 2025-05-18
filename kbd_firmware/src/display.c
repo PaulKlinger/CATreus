@@ -239,48 +239,10 @@ void lcd_display() {
 }
 
 
-void i2c_scanner() {
-    uint8_t error = 0u;
-	uint8_t dst;
-	uint8_t i2c_dev_cnt = 0;
-	struct i2c_msg msgs[1];
-	msgs[0].buf = &dst;
-	msgs[0].len = 1U;
-	msgs[0].flags = I2C_MSG_WRITE | I2C_MSG_STOP;
-
-	/* Use the full range of I2C address for display purpose */	
-	for (uint16_t x = 0; x <= 0x7f; x++) {
-		/* New line every 0x10 address */
-		if (x % 0x10 == 0) {
-			printk("|\n0x%02x| ",x);	
-		}
-		/* Range the test with the start and stop value configured in the kconfig */
-		if (x >= 0 && x <= 0x7f)	{	
-			/* Send the address to read from */
-			error = i2c_transfer(dev_i2c.bus, &msgs[0], 1, x);
-				/* I2C device found on current address */
-				if (error == 0) {
-					printk("0x%02x ",x);
-					i2c_dev_cnt++;
-				}
-				else {
-					printk(" --  ");
-				}
-		} else {
-			/* Scan value out of range, not scanned */
-			printk("     ");
-		}
-	}
-	printk("|\n");
-	printk("\nI2C device(s) found on the bus: %d\nScanning done.\n\n", i2c_dev_cnt);
-	printk("Find the registered I2C address on: https://i2cdevices.org/addresses\n\n");
-}
 
 void display_init(void)
 {
     init_i2c();
-
-    i2c_scanner();
 
     int ret = lcd_command(init_sequence, sizeof(init_sequence));
     if (ret != 0) {
@@ -288,7 +250,7 @@ void display_init(void)
     }
     lcd_goto_xpix_y(20, 2);
     lcd_putc('H');
-    lcd_putc('i');
+    lcd_putc('o');
     lcd_putc('!');
     lcd_display();
 

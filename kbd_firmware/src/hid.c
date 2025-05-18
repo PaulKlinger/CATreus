@@ -266,14 +266,14 @@ void hid_init(void)
 {
 }
 
-#define SW0_NODE DT_ALIAS(sw0)
+#define WAKE_BTN_NODE DT_NODELABEL(wakebtn)
 
 void hid_button_loop(void)
 {
-#if DT_NODE_HAS_STATUS_OKAY(SW0_NODE)
-    const struct gpio_dt_spec sw0 = GPIO_DT_SPEC_GET(SW0_NODE, gpios);
+#if DT_NODE_HAS_STATUS_OKAY(WAKE_BTN_NODE)
+    const struct gpio_dt_spec wake_btn = GPIO_DT_SPEC_GET(WAKE_BTN_NODE, gpios);
 
-    gpio_pin_configure_dt(&sw0, GPIO_INPUT);
+    gpio_pin_configure_dt(&wake_btn, GPIO_INPUT);
 
     for (;;)
     {
@@ -286,7 +286,7 @@ void hid_button_loop(void)
              */
             int8_t report[8] = {0};
 
-            if (gpio_pin_get_dt(&sw0))
+            if (gpio_pin_get_dt(&wake_btn))
             {
                 report[2] = 0x1c;
             }
@@ -295,6 +295,7 @@ void hid_button_loop(void)
                            report, sizeof(report));
         }
         k_sleep(K_MSEC(100));
+        printk(".");
     }
 #endif
 }

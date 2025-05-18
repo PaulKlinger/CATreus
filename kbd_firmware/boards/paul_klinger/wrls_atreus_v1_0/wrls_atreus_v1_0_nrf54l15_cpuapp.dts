@@ -1,0 +1,279 @@
+/dts-v1/;
+#include <nordic/nrf54l15_cpuapp.dtsi>
+#include "wrls_atreus_v1_0-pinctrl.dtsi"
+
+#include <dt-bindings/regulator/npm1300.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+
+/ {
+	model = "wrls atreus";
+	compatible = "paul_klinger,wrls-atreus-v1-0-cpuapp";
+
+	chosen {
+		zephyr,code-partition = &slot0_partition;
+		zephyr,sram = &cpuapp_sram;
+		zephyr,flash = &cpuapp_rram;
+		zephyr,console = &uart22;
+		//zephyr,shell-uart = &uart00;
+		//zephyr,uart-mcumgr = &uart00;
+		//nordic,nus-uart = &uart00;
+	};
+
+	buttons {
+		compatible = "gpio-keys";
+		wakebtn: wake_btn {
+			gpios = <&gpio0 4 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			label = "wake_btn";
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		led0: led0 {
+			gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
+			label = "LED0";
+		};
+	};
+};
+
+&cpuapp_sram {
+	status = "okay";
+};
+
+&grtc {
+	owned-channels = <0 1 2 3 4 5 6 7 8 9 10 11>;
+	/* Channels 7-11 reserved for Zero Latency IRQs, 3-4 for FLPR */
+	child-owned-channels = <3 4 7 8 9 10 11>;
+	status = "okay";
+};
+
+&cpuapp_rram {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x0 DT_SIZE_K(64)>;
+		};
+		slot0_partition: partition@10000 {
+			label = "image-0";
+			reg = <0x10000 DT_SIZE_K(324)>;
+		};
+		slot0_ns_partition: partition@61000 {
+			label = "image-0-nonsecure";
+			reg = <0x61000 DT_SIZE_K(324)>;
+		};
+		slot1_partition: partition@b2000 {
+			label = "image-1";
+			reg = <0xb2000 DT_SIZE_K(324)>;
+		};
+		slot1_ns_partition: partition@103000 {
+			label = "image-1-nonsecure";
+			reg = <0x103000 DT_SIZE_K(324)>;
+		};
+		/* 32k from 0x154000 to 0x15bfff reserved for TF-M partitions */
+		storage_partition: partition@15c000 {
+			label = "storage";
+			reg = <0x15c000 DT_SIZE_K(36)>;
+		};
+	};
+};
+
+&regulators {
+	status = "okay";
+};
+
+&radio {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+&gpio2 {
+	status = "okay";
+};
+
+&i2c20 {
+	status = "okay";
+	pinctrl-0 = <&i2c20_default>;
+	pinctrl-names = "default";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+	npm1300_ek_pmic: pmic@6b {
+		compatible = "nordic,npm1300";
+		reg = <0x6b>;
+
+
+		// ship-to-active-time = <96>;
+
+
+		// long-press-reset = "one_button";
+
+
+		npm1300_ek_gpio: gpio-controller {
+			compatible = "nordic,npm1300-gpio";
+			gpio-controller;
+			#gpio-cells = <2>;
+			ngpios = <5>;
+		};
+
+		npm1300_ek_regulators: regulators {
+			compatible = "nordic,npm1300-regulator";
+
+
+			npm1300_ek_buck1: BUCK1 {
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3300000>;
+
+				retention-microvolt = <1000000>;
+			};
+
+
+
+			npm1300_ek_buck2: BUCK2 {
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-init-microvolt = <3300000>;
+				retention-microvolt = <1000000>;
+			};
+
+
+
+			npm1300_ek_ldo1: LDO1 {
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3300000>;
+
+				regulator-initial-mode = <NPM1300_LDSW_MODE_LDSW>;
+
+				regulator-boot-on;
+			};
+
+
+
+			npm1300_ek_ldo2: LDO2 {
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-initial-mode = <NPM1300_LDSW_MODE_LDSW>;
+			};
+
+		};
+
+
+		npm1300_ek_charger: charger {
+			compatible = "nordic,npm1300-charger";
+			term-microvolt = <4200000>;
+			term-warm-microvolt = <4200000>;
+			// term-current-percent = <10>;
+			current-microamp = <250000>;
+			// trickle-microvolt = <2500000>;
+			dischg-limit-microamp = <200000>;
+			vbus-limit-microamp = <500000>;
+			thermistor-ohms = <0>;
+			thermistor-beta = <3380>;
+
+			// disable-recharge;
+			charging-enable;
+
+		};
+
+
+		npm1300_ek_leds: leds {
+			compatible = "nordic,npm1300-led";
+			nordic,led0-mode = "charging";
+			nordic,led1-mode = "host";
+			nordic,led2-mode = "host";
+			status = "okay";
+		};
+
+	};
+};
+
+&pinctrl {
+	i2c20_default: i2c20_default {
+
+		group2 {
+			psels = <NRF_PSEL(TWIM_SCL, 1, 11)>, <NRF_PSEL(TWIM_SDA, 1, 12)>;
+			bias-pull-up;
+		};
+	};
+
+	i2c21_default: i2c21_default {
+
+		group2 {
+			psels = <NRF_PSEL(TWIM_SCL, 1, 9)>, <NRF_PSEL(TWIM_SDA, 1, 10)>;
+			bias-pull-up;
+		};
+	};
+
+	uart00_default: uart00_default {
+		group1 {
+			psels = <NRF_PSEL(UART_RX, 2, 10)>,
+					<NRF_PSEL(UART_TX, 2, 9)>,
+					<NRF_PSEL(UART_RTS, 2, 8)>,
+					<NRF_PSEL(UART_CTS, 2, 7)>;
+		};
+	};
+
+	uart22_default: uart22_default {
+		group1 {
+			psels = <NRF_PSEL(UART_RX, 1, 3)>,
+					<NRF_PSEL(UART_TX, 1, 4)>,
+					<NRF_PSEL(UART_RTS, 2, 0)>,
+					<NRF_PSEL(UART_CTS, 2, 1)>;
+		};
+	};
+};
+
+&cpuflpr_vpr {
+	status = "disabled";
+};
+
+&vregmain {
+	status = "okay";
+};
+
+&clock {
+	status = "okay";
+};
+
+&adc {
+	status = "disabled";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&i2c21 {
+	display: display@3C {
+		compatible = "i2c-device";
+		reg = <0x3C>;
+		label = "SSD1306";
+	};
+
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+	pinctrl-0 = <&i2c21_default>;
+	pinctrl-names = "default";
+	zephyr,concat-buf-size = <0x2048>;
+	zephyr,flash-buf-max-size = <0x2048>;
+	compatible = "nordic,nrf-twim";
+};
+&gpiote30 {
+	status = "okay";
+};
+
+&gpiote20 {
+	status = "okay";
+};
+
+&uart22 {
+	compatible = "nordic,nrf-uarte";
+	status = "okay";
+	current-speed = <9600>;
+	pinctrl-0 = <&uart22_default>;
+	pinctrl-names = "default";
+};

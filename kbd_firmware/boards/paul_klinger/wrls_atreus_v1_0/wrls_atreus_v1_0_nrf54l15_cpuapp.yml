@@ -1,0 +1,10 @@
+identifier: wrls_atreus_v1_0/nrf54l15/cpuapp
+name: wrls atreus
+vendor: paul_klinger
+arch: arm
+toolchain:
+  - zephyr
+sysbuild: true
+ram: 188
+flash: 324
+supported: []

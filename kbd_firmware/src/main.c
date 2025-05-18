@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include <stdio.h>
 
  #include <zephyr/types.h>
  #include <stddef.h>
@@ -21,6 +22,14 @@
  #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/drivers/gpio.h>
 
+#include <zephyr/drivers/sensor/npm1300_charger.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/regulator.h>
+
+
+#include <zephyr/drivers/i2c.h>
+
 
 #include "hid.h"
 
@@ -30,13 +39,13 @@
 #define SLEEP_TIME_MS   200
 
 /* The devicetree node identifier for the "led0" alias. */
-#define LED3_NODE DT_ALIAS(led3)
+#define LED0_NODE DT_NODELABEL(led0)
 
 /*
  * A build error on this line means your board is unsupported.
  * See the sample documentation for information on how to fix this.
  */
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED3_NODE, gpios);
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 
 static const struct bt_data ad[] = {
@@ -124,25 +133,141 @@ static void bt_ready(int err)
 	printk("Advertising successfully started\n");
 }
 
+static const struct device *pmic = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_pmic));
 
+static const struct device *charger = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_charger));
+
+
+static const struct i2c_dt_spec pmic_i2c = I2C_DT_SPEC_GET(DT_NODELABEL(npm1300_ek_pmic));
+
+static const struct i2c_dt_spec display_i2c = I2C_DT_SPEC_GET(DT_NODELABEL(display));
+
+static const struct device *disp_ldsw = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_ldo1));
+
+void i2c_scanner(const struct device *bus) {
+    uint8_t error = 0u;
+	uint8_t dst;
+	uint8_t i2c_dev_cnt = 0;
+	struct i2c_msg msgs[1];
+	msgs[0].buf = &dst;
+	msgs[0].len = 1U;
+	msgs[0].flags = I2C_MSG_WRITE | I2C_MSG_STOP;
+
+	/* Use the full range of I2C address for display purpose */	
+	for (uint16_t x = 0; x <= 0x7f; x++) {
+		/* New line every 0x10 address */
+		if (x % 0x10 == 0) {
+			printk("|\n0x%02x| ",x);	
+		}
+		/* Range the test with the start and stop value configured in the kconfig */
+		if (x >= 0 && x <= 0x7f)	{	
+			/* Send the address to read from */
+			error = i2c_transfer(bus, &msgs[0], 1, x);
+				/* I2C device found on current address */
+				if (error == 0) {
+					printk("0x%02x ",x);
+					i2c_dev_cnt++;
+				}
+				else {
+					printk(" --  ");
+				}
+		} else {
+			/* Scan value out of range, not scanned */
+			printk("     ");
+		}
+	}
+	printk("|\n");
+	printk("\nI2C device(s) found on the bus: %d\nScanning done.\n\n", i2c_dev_cnt);
+	printk("Find the registered I2C address on: https://i2cdevices.org/addresses\n\n");
+}
+
+int get_charger_attr(enum sensor_channel channel, enum sensor_attribute attr, struct sensor_value *val)
+{
+	int ret = sensor_attr_get(charger, channel, attr, val);
+	if (ret) {
+		printk("charger attr get failed %d\n", ret);
+	}
+	return ret;
+}
+
+int get_charger_channel(enum sensor_channel channel, struct sensor_value *val)
+{
+	int ret = sensor_channel_get(charger, channel, val);
+	if (ret) {
+		printk("charger channel get failed %d\n", ret);
+	}
+	return ret;
+}
 
 int main(void)
 {
 	int ret;
-	bool led_state = true;
-
 	if (!gpio_is_ready_dt(&led)) {
 		return 0;
 	}
+	
+	printk("Starting wrls atreus\n");
 
 	ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
 	if (ret < 0) {
 		return 0;
 	}
-	gpio_pin_toggle_dt(&led);
 
+	for (int i = 0; i < 4; i++) {
+		gpio_pin_toggle_dt(&led);
+		k_msleep(200);
+	}
+
+	if (!device_is_ready(charger)) {
+		while (1) {
+			printk("charger device not ready.\n");
+			k_msleep(300);
+
+	}
+		return false;
+	}
+
+	printk("scan pmic i2c bus\n");
+	i2c_scanner(pmic_i2c.bus);
+	printk("scan display i2c bus\n");
+	i2c_scanner(display_i2c.bus);
+
+	printk("finish scanning i2c bus\n");
+
+	ret = regulator_is_enabled(disp_ldsw);
+	if (ret) {
+		printk("display ldo already enabled\n");
+	} else {
+		printk("display ldo not enabled\n");
+	}
+	ret = regulator_enable(disp_ldsw);
+	printk("enable display ldo ret %d\n", ret);
+
+
+	struct sensor_value val;
+	while (1) {
+		sensor_sample_fetch(charger);
+		get_charger_attr(SENSOR_CHAN_NPM1300_CHARGER_VBUS_STATUS, SENSOR_ATTR_NPM1300_CHARGER_VBUS_PRESENT, &val);
+		int32_t vbus_present = val.val1;
+		get_charger_channel(SENSOR_CHAN_NPM1300_CHARGER_STATUS, &val);
+		int32_t charger_status = val.val1;
+		get_charger_channel(SENSOR_CHAN_NPM1300_CHARGER_ERROR, &val);
+		int32_t charger_error = val.val1;
+		get_charger_attr(SENSOR_CHAN_GAUGE_DESIRED_CHARGING_CURRENT, SENSOR_ATTR_CONFIGURATION, &val);
+		char des_current[6];
+		gcvt((float) val.val1 * 1000.0 + ((float) val.val2) / 1000.0f, 4, des_current);
+		get_charger_channel(SENSOR_CHAN_GAUGE_AVG_CURRENT, &val);
+		char current[6];
+		gcvt((float) val.val1 * 1000.f + ((float) val.val2) / 1000.0f, 4, current);
+		get_charger_channel(SENSOR_CHAN_GAUGE_VOLTAGE, &val);
+		char voltage[6];
+		gcvt((float) val.val1 + ((float) val.val2) / 1000000.0f, 4, voltage);
+		printk("vbus_present %d charger_status %d error: %d desired cur: %smA current: %smA bat: %sV\n", vbus_present, charger_status, charger_error, des_current, current, voltage);
+
+		k_msleep(500);
+	}
 	k_msleep(100);
-	display_init();
+	//display_init();
 
 	int err;
 
@@ -152,16 +277,5 @@ int main(void)
 		return 0;
 	}
 	hid_button_loop();
-
-	while (1) {
-		ret = gpio_pin_toggle_dt(&led);
-		if (ret < 0) {
-			return 0;
-		}
-
-		led_state = !led_state;
-		printf("LED state: %s\n", led_state ? "ON" : "OFF");
-		k_msleep(SLEEP_TIME_MS);
-	}
 	return 0;
 }
