@@ -243,7 +243,14 @@ int main(void)
 	} else {
 		printk("display ldsw not enabled\n");
 	}
+	
+	int err;
 
+	err = bt_enable(bt_ready);
+	if (err) {
+		printk("Bluetooth init failed (err %d)\n", err);
+		return 0;
+	}
 	
     gpio_pin_configure_dt(&wake_btn, GPIO_INPUT);
 	struct sensor_value val;
@@ -255,9 +262,6 @@ int main(void)
 		int32_t charger_status = val.val1;
 		get_charger_channel(SENSOR_CHAN_NPM1300_CHARGER_ERROR, &val);
 		int32_t charger_error = val.val1;
-		get_charger_attr(SENSOR_CHAN_GAUGE_DESIRED_CHARGING_CURRENT, SENSOR_ATTR_CONFIGURATION, &val);
-		char des_current[6];
-		gcvt((float) val.val1 * 1000.0 + ((float) val.val2) / 1000.0f, 4, des_current);
 		get_charger_channel(SENSOR_CHAN_GAUGE_AVG_CURRENT, &val);
 		char current[6];
 		gcvt((float) val.val1 * 1000.f + ((float) val.val2) / 1000.0f, 4, current);
@@ -265,8 +269,15 @@ int main(void)
 		char voltage[6];
 		gcvt((float) val.val1 + ((float) val.val2) / 1000000.0f, 4, voltage);
 		bool ldsw_on = regulator_is_enabled(disp_ldsw);
-		printk("vbus_present %d charger_status %d error: %d desired cur: %smA current: %smA bat: %sV ldsw: %d\n", vbus_present, charger_status, charger_error, des_current, current, voltage, ldsw_on);
-
+		char str[100];
+		sprintf(str, "usb %d s %d e %d \n %smA %sV d:%d\n", vbus_present, charger_status, charger_error, current, voltage, ldsw_on);
+		printk("%s", str);
+		if (ldsw_on) {
+			lcd_goto_xpix_y(0, 0);
+			lcd_clear_buffer();
+			lcd_puts(str);
+			lcd_display();
+		}
 
 		if (gpio_pin_get_dt(&wake_btn)) {
 			if (ldsw_on) {
@@ -286,13 +297,6 @@ int main(void)
 	}
 	k_msleep(100);
 
-	int err;
-
-	err = bt_enable(bt_ready);
-	if (err) {
-		printk("Bluetooth init failed (err %d)\n", err);
-		return 0;
-	}
 	hid_button_loop();
 	return 0;
 }

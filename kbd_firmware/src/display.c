@@ -226,6 +226,19 @@ void lcd_putc(char c){
     cursorPosition.x += sizeof(FONT[0]);
 }
 
+void lcd_puts(const char* s){
+    while (*s) {
+        if (*s == '\n') {
+            cursorPosition.x = 0;
+            cursorPosition.y++;
+            lcd_goto_xpix_y(cursorPosition.x, cursorPosition.y);
+        } else {
+            lcd_putc(*s);
+        }
+        s++;
+    }
+}
+
 void lcd_clear_buffer() {
     for (uint8_t i = 0; i < DISPLAY_HEIGHT/8; i++){
         memset(displayBuffer[i], 0x00, sizeof(displayBuffer[i]));
