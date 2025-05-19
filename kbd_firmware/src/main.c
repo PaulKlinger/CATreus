@@ -144,6 +144,8 @@ static const struct i2c_dt_spec display_i2c = I2C_DT_SPEC_GET(DT_NODELABEL(displ
 
 static const struct device *disp_ldsw = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_ldo1));
 
+const struct gpio_dt_spec wake_btn = GPIO_DT_SPEC_GET(DT_NODELABEL(wakebtn), gpios);
+
 void i2c_scanner(const struct device *bus) {
     uint8_t error = 0u;
 	uint8_t dst;
@@ -213,7 +215,7 @@ int main(void)
 		return 0;
 	}
 
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < 5; i++) {
 		gpio_pin_toggle_dt(&led);
 		k_msleep(200);
 	}
@@ -236,14 +238,14 @@ int main(void)
 
 	ret = regulator_is_enabled(disp_ldsw);
 	if (ret) {
-		printk("display ldo already enabled\n");
+		printk("display ldsw enabled, disabling\n");
+		regulator_disable(disp_ldsw);
 	} else {
-		printk("display ldo not enabled\n");
+		printk("display ldsw not enabled\n");
 	}
-	ret = regulator_enable(disp_ldsw);
-	printk("enable display ldo ret %d\n", ret);
 
-
+	
+    gpio_pin_configure_dt(&wake_btn, GPIO_INPUT);
 	struct sensor_value val;
 	while (1) {
 		sensor_sample_fetch(charger);
@@ -262,12 +264,27 @@ int main(void)
 		get_charger_channel(SENSOR_CHAN_GAUGE_VOLTAGE, &val);
 		char voltage[6];
 		gcvt((float) val.val1 + ((float) val.val2) / 1000000.0f, 4, voltage);
-		printk("vbus_present %d charger_status %d error: %d desired cur: %smA current: %smA bat: %sV\n", vbus_present, charger_status, charger_error, des_current, current, voltage);
+		bool ldsw_on = regulator_is_enabled(disp_ldsw);
+		printk("vbus_present %d charger_status %d error: %d desired cur: %smA current: %smA bat: %sV ldsw: %d\n", vbus_present, charger_status, charger_error, des_current, current, voltage, ldsw_on);
 
+
+		if (gpio_pin_get_dt(&wake_btn)) {
+			if (ldsw_on) {
+				printk("disable display\n");
+				ret = regulator_disable(disp_ldsw);
+				printk("disable display ldo ret %d\n", ret);
+			} else {
+				printk("enable display\n");
+				ret = regulator_enable(disp_ldsw);
+				k_msleep(50);
+				display_init();
+				printk("enable display ldo ret %d\n", ret);
+			}
+		}
+		
 		k_msleep(500);
 	}
 	k_msleep(100);
-	//display_init();
 
 	int err;
 
