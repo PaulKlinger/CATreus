@@ -20,7 +20,6 @@
  #include <zephyr/bluetooth/conn.h>
  #include <zephyr/bluetooth/uuid.h>
  #include <zephyr/bluetooth/gatt.h>
-#include <zephyr/drivers/gpio.h>
 
 #include <zephyr/drivers/sensor/npm1300_charger.h>
 #include <zephyr/drivers/uart.h>
@@ -34,6 +33,7 @@
 #include "hid.h"
 
 #include "display.h"
+#include "key_matrix.h"
 
 /* 1000 msec = 1 sec */
 #define SLEEP_TIME_MS   200
@@ -144,7 +144,6 @@ static const struct i2c_dt_spec display_i2c = I2C_DT_SPEC_GET(DT_NODELABEL(displ
 
 static const struct device *disp_ldsw = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_ldo1));
 
-const struct gpio_dt_spec wake_btn = GPIO_DT_SPEC_GET(DT_NODELABEL(wakebtn), gpios);
 
 void i2c_scanner(const struct device *bus) {
     uint8_t error = 0u;
@@ -251,8 +250,8 @@ int main(void)
 		printk("Bluetooth init failed (err %d)\n", err);
 		return 0;
 	}
-	
-    gpio_pin_configure_dt(&wake_btn, GPIO_INPUT);
+	printk("Init key matrix\n");
+	init_key_matrix();
 	struct sensor_value val;
 	while (1) {
 		sensor_sample_fetch(charger);
@@ -272,6 +271,16 @@ int main(void)
 		char str[100];
 		sprintf(str, "usb %d s %d e %d \n %smA %sV d:%d\n", vbus_present, charger_status, charger_error, current, voltage, ldsw_on);
 		printk("%s", str);
+		
+		struct pressed_keys keys = read_key_matrix();
+		if (keys.n_pressed > 0) {
+			printk("pressed keys: ");
+			for (int i = 0; i < keys.n_pressed; i++) {
+				printk("%d,%d ", keys.keys[i].row, keys.keys[i].col);
+			}
+			printk("\n");
+		}
+
 		if (ldsw_on) {
 			lcd_goto_xpix_y(0, 0);
 			lcd_clear_buffer();
@@ -279,7 +288,7 @@ int main(void)
 			lcd_display();
 		}
 
-		if (gpio_pin_get_dt(&wake_btn)) {
+		if (wake_pressed()) {
 			if (ldsw_on) {
 				printk("disable display\n");
 				ret = regulator_disable(disp_ldsw);
@@ -292,8 +301,9 @@ int main(void)
 				printk("enable display ldo ret %d\n", ret);
 			}
 		}
-		
-		k_msleep(500);
+		k_msleep(50); // min 50ms between keypresses
+		ret = wait_for_key(2000); 
+		printk("wake sem ret %d\n", ret);
 	}
 	k_msleep(100);
 
