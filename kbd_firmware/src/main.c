@@ -32,8 +32,7 @@
 #include "config.h"
 #include "key_layout.h"
 #include "hid.h"
-
-
+#include "ui.h"
 
 #include "display.h"
 #include "key_matrix.h"
@@ -52,6 +51,8 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 
 static const struct device *disp_ldsw = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_ldo1));
+
+static const struct device *regulators = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_regulators));
 
 
 static const struct bt_data ad[] = {
@@ -228,7 +229,20 @@ int main(void)
 
 
 		if (wake_pressed()) {
-			if (regulator_is_enabled(disp_ldsw)) {
+			if (keys.keys[1].row == 1 && keys.keys[1].col == 6) {
+				while (wake_pressed()) {
+					k_msleep(10);
+				}
+				k_msleep(100);
+				printk("Going to sleep (ship mode)\n");
+				ret = regulator_parent_ship_mode(regulators);
+				printk("ship mode ret %d\n", ret);
+				printk("Should be asleep!\n");
+				k_msleep(100);
+				printk("Should have been asleep 100ms!\n");
+				k_sleep(K_FOREVER);
+			}
+			else if (regulator_is_enabled(disp_ldsw)) {
 				printk("disable display\n");
 				ret = regulator_disable(disp_ldsw);
 				printk("disable display ldo ret %d\n", ret);

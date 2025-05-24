@@ -103,6 +103,11 @@
 	status = "okay";
 };
 
+&vregmain {
+	status = "okay";
+	regulator-initial-mode = <NRF5X_REG_MODE_DCDC>;
+};
+
 &radio {
 	status = "okay";
 };
@@ -276,7 +281,7 @@
 &uart22 {
 	compatible = "nordic,nrf-uarte";
 	status = "okay";
-	current-speed = <9600>;
+	current-speed = <115200>;
 	pinctrl-0 = <&uart22_default>;
 	pinctrl-names = "default";
 };
