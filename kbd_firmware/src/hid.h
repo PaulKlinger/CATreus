@@ -8,14 +8,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
- #ifdef __cplusplus
- extern "C" {
- #endif
- 
- void hid_init(void);
- 
- void hid_button_loop(void);
- 
- #ifdef __cplusplus
- }
- #endif
+#ifndef HID_H
+#define HID_H
+
+#include "config.h"
+
+void hid_init(void);
+
+void send_encoded_keys(struct encoded_keys keys);
+
+#endif // HID_H

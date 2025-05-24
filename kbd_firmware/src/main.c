@@ -29,8 +29,11 @@
 
 #include <zephyr/drivers/i2c.h>
 
-
+#include "config.h"
+#include "key_layout.h"
 #include "hid.h"
+
+
 
 #include "display.h"
 #include "key_matrix.h"
@@ -46,6 +49,9 @@
  * See the sample documentation for information on how to fix this.
  */
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+
+
+static const struct device *disp_ldsw = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_ldo1));
 
 
 static const struct bt_data ad[] = {
@@ -133,18 +139,6 @@ static void bt_ready(int err)
 	printk("Advertising successfully started\n");
 }
 
-static const struct device *pmic = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_pmic));
-
-static const struct device *charger = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_charger));
-
-
-static const struct i2c_dt_spec pmic_i2c = I2C_DT_SPEC_GET(DT_NODELABEL(npm1300_ek_pmic));
-
-static const struct i2c_dt_spec display_i2c = I2C_DT_SPEC_GET(DT_NODELABEL(display));
-
-static const struct device *disp_ldsw = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_ldo1));
-
-
 void i2c_scanner(const struct device *bus) {
     uint8_t error = 0u;
 	uint8_t dst;
@@ -182,23 +176,6 @@ void i2c_scanner(const struct device *bus) {
 	printk("Find the registered I2C address on: https://i2cdevices.org/addresses\n\n");
 }
 
-int get_charger_attr(enum sensor_channel channel, enum sensor_attribute attr, struct sensor_value *val)
-{
-	int ret = sensor_attr_get(charger, channel, attr, val);
-	if (ret) {
-		printk("charger attr get failed %d\n", ret);
-	}
-	return ret;
-}
-
-int get_charger_channel(enum sensor_channel channel, struct sensor_value *val)
-{
-	int ret = sensor_channel_get(charger, channel, val);
-	if (ret) {
-		printk("charger channel get failed %d\n", ret);
-	}
-	return ret;
-}
 
 int main(void)
 {
@@ -219,22 +196,6 @@ int main(void)
 		k_msleep(200);
 	}
 
-	if (!device_is_ready(charger)) {
-		while (1) {
-			printk("charger device not ready.\n");
-			k_msleep(300);
-
-	}
-		return false;
-	}
-
-	printk("scan pmic i2c bus\n");
-	i2c_scanner(pmic_i2c.bus);
-	printk("scan display i2c bus\n");
-	i2c_scanner(display_i2c.bus);
-
-	printk("finish scanning i2c bus\n");
-
 	ret = regulator_is_enabled(disp_ldsw);
 	if (ret) {
 		printk("display ldsw enabled, disabling\n");
@@ -250,28 +211,10 @@ int main(void)
 		printk("Bluetooth init failed (err %d)\n", err);
 		return 0;
 	}
+
 	printk("Init key matrix\n");
 	init_key_matrix();
-	struct sensor_value val;
 	while (1) {
-		sensor_sample_fetch(charger);
-		get_charger_attr(SENSOR_CHAN_NPM1300_CHARGER_VBUS_STATUS, SENSOR_ATTR_NPM1300_CHARGER_VBUS_PRESENT, &val);
-		int32_t vbus_present = val.val1;
-		get_charger_channel(SENSOR_CHAN_NPM1300_CHARGER_STATUS, &val);
-		int32_t charger_status = val.val1;
-		get_charger_channel(SENSOR_CHAN_NPM1300_CHARGER_ERROR, &val);
-		int32_t charger_error = val.val1;
-		get_charger_channel(SENSOR_CHAN_GAUGE_AVG_CURRENT, &val);
-		char current[6];
-		gcvt((float) val.val1 * 1000.f + ((float) val.val2) / 1000.0f, 4, current);
-		get_charger_channel(SENSOR_CHAN_GAUGE_VOLTAGE, &val);
-		char voltage[6];
-		gcvt((float) val.val1 + ((float) val.val2) / 1000000.0f, 4, voltage);
-		bool ldsw_on = regulator_is_enabled(disp_ldsw);
-		char str[100];
-		sprintf(str, "usb %d s %d e %d \n %smA %sV d:%d\n", vbus_present, charger_status, charger_error, current, voltage, ldsw_on);
-		printk("%s", str);
-		
 		struct pressed_keys keys = read_key_matrix();
 		if (keys.n_pressed > 0) {
 			printk("pressed keys: ");
@@ -280,16 +223,12 @@ int main(void)
 			}
 			printk("\n");
 		}
+		struct encoded_keys encoded_keys = encode_keys(keys);
+		send_encoded_keys(encoded_keys);
 
-		if (ldsw_on) {
-			lcd_goto_xpix_y(0, 0);
-			lcd_clear_buffer();
-			lcd_puts(str);
-			lcd_display();
-		}
 
 		if (wake_pressed()) {
-			if (ldsw_on) {
+			if (regulator_is_enabled(disp_ldsw)) {
 				printk("disable display\n");
 				ret = regulator_disable(disp_ldsw);
 				printk("disable display ldo ret %d\n", ret);
@@ -298,15 +237,23 @@ int main(void)
 				ret = regulator_enable(disp_ldsw);
 				k_msleep(50);
 				display_init();
+				show_debug_page();
 				printk("enable display ldo ret %d\n", ret);
+				// TODO: UI thread
 			}
 		}
-		k_msleep(50); // min 50ms between keypresses
-		ret = wait_for_key(2000); 
-		printk("wake sem ret %d\n", ret);
+		if (keys.n_pressed > 0) {
+			// if keys are pressed always sleep for 50ms
+			// (we can't use the level interrupt here)
+			// TODO: could switch to edge interrupt in this case??
+			//       or go to deep sleep if keys don't change for a long time
+			k_msleep(50);
+		} else {
+			ret = wait_for_key(2000); 
+			printk("wake sem ret %d\n", ret);
+		}
+		
 	}
-	k_msleep(100);
 
-	hid_button_loop();
 	return 0;
 }

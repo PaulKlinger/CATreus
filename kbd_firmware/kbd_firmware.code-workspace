@@ -14,7 +14,11 @@
 			"xiosbase": "c",
 			"npm1300_charger.h": "c",
 			"i2c.h": "c",
-			"xutility": "c"
+			"xutility": "c",
+			"key_matrix.h": "c",
+			"key_layout.h": "c",
+			"hid.h": "c",
+			"stdio.h": "c"
 		}
 	}
 }

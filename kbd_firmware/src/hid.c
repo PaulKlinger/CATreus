@@ -23,6 +23,8 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
 
+#include "key_layout.h"
+
 enum
 {
     HIDS_REMOTE_WAKE = BIT(0),
@@ -184,54 +186,58 @@ static ssize_t write_ctrl_point(struct bt_conn *conn,
 //                            BT_GATT_PERM_WRITE,
 //                            NULL, write_ctrl_point, &ctrl_point), );
 
-
-static uint8_t protocol_mode = 1;  // default to protocol mode
-
+static uint8_t protocol_mode = 1; // default to protocol mode
 
 static uint8_t output_report = 0;
 
-static ssize_t read_protocol_mode(struct bt_conn* conn, const struct bt_gatt_attr* attr, void* buf,
-    uint16_t len, uint16_t offset) {
-return bt_gatt_attr_read(conn, attr, buf, len, offset, attr->user_data, sizeof(protocol_mode));
+static ssize_t read_protocol_mode(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
+                                  uint16_t len, uint16_t offset)
+{
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, attr->user_data, sizeof(protocol_mode));
 }
 
-static ssize_t write_protocol_mode(struct bt_conn* conn, const struct bt_gatt_attr* attr,
-     const void* buf, uint16_t len, uint16_t offset, uint8_t flags) {
-uint8_t* value = attr->user_data;
+static ssize_t write_protocol_mode(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+                                   const void *buf, uint16_t len, uint16_t offset, uint8_t flags)
+{
+    uint8_t *value = attr->user_data;
 
-if (offset + len > sizeof(protocol_mode)) {
-return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    if (offset + len > sizeof(protocol_mode))
+    {
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    }
+
+    memcpy(value + offset, buf, len);
+
+    return len;
 }
 
-memcpy(value + offset, buf, len);
-
-return len;
+static ssize_t read_output_report(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
+                                  uint16_t len, uint16_t offset)
+{
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, attr->user_data, sizeof(output_report));
 }
 
-static ssize_t read_output_report(struct bt_conn* conn, const struct bt_gatt_attr* attr, void* buf,
-    uint16_t len, uint16_t offset) {
-return bt_gatt_attr_read(conn, attr, buf, len, offset, attr->user_data, sizeof(output_report));
+static ssize_t write_output_report(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+                                   const void *buf, uint16_t len, uint16_t offset, uint8_t flags)
+{
+    uint8_t *value = attr->user_data;
+
+    if (offset + len > sizeof(protocol_mode))
+    {
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    }
+
+    memcpy(value + offset, buf, len);
+
+    return len;
 }
 
-static ssize_t write_output_report(struct bt_conn* conn, const struct bt_gatt_attr* attr,
-    const void* buf, uint16_t len, uint16_t offset, uint8_t flags) {
-uint8_t* value = attr->user_data;
-
-if (offset + len > sizeof(protocol_mode)) {
-return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+static void boot_input_ccc_changed(const struct bt_gatt_attr *attr, uint16_t value)
+{
 }
-
-memcpy(value + offset, buf, len);
-
-return len;
-}
-
-static void boot_input_ccc_changed(const struct bt_gatt_attr* attr, uint16_t value) {
-}
-
 
 BT_GATT_SERVICE_DEFINE(
-    hid_keyboard_service, 
+    hid_keyboard_service,
     BT_GATT_PRIMARY_SERVICE(BT_UUID_HIDS),
     BT_GATT_CHARACTERISTIC(BT_UUID_HIDS_PROTOCOL_MODE,
                            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE_WITHOUT_RESP,
@@ -266,33 +272,20 @@ void hid_init(void)
 {
 }
 
-
-void hid_button_loop(void)
+void send_encoded_keys(struct encoded_keys keys)
 {
-    const struct gpio_dt_spec wake_btn = GPIO_DT_SPEC_GET(DT_NODELABEL(wakebtn), gpios);
+    /* HID Report:
+     * Byte 0: modifier mask
+     * Byte 1-6: keys (up to 6 keys)
+     */
+    uint8_t report[8] = {0};
 
-    gpio_pin_configure_dt(&wake_btn, GPIO_INPUT);
+    report[0] = keys.modifier_mask;
 
-    for (;;)
+    for (int i = 0; i < MAX_N_ENCODED_KEYS; i++)
     {
-        if (simulate_input)
-        {
-            /* HID Report:
-             * Byte 0: buttons (lower 3 bits)
-             * Byte 1: X axis (int8)
-             * Byte 2: Y axis (int8)
-             */
-            int8_t report[8] = {0};
-
-            if (gpio_pin_get_dt(&wake_btn))
-            {
-                report[2] = 0x1c;
-            }
-
-            bt_gatt_notify(NULL, &hid_keyboard_service.attrs[4],
-                           report, sizeof(report));
-        }
-        k_sleep(K_MSEC(100));
-        printk(".");
+        report[i + 2] = keys.keys[i];
     }
+
+    bt_gatt_notify(NULL, &hid_keyboard_service.attrs[4], report, sizeof(report));
 }

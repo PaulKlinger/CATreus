@@ -1,20 +1,9 @@
+#ifndef KEY_MATRIX_H
+#define KEY_MATRIX_H
 
- #ifdef __cplusplus
- extern "C" {
- #endif
-
- #include <stdint.h>
- #include <stdbool.h>
- 
- struct key_coord {
-        uint8_t row;
-        uint8_t col;
- };
-
- struct pressed_keys {
-    struct key_coord keys[5];
-    uint8_t n_pressed;
- };
+#include <stdint.h>
+#include <stdbool.h>
+#include "config.h"
 
 struct pressed_keys read_key_matrix(void);
 
@@ -24,7 +13,6 @@ bool wake_pressed(void);
 
 int wait_for_key(int timeout_ms);
 
- 
- #ifdef __cplusplus
- }
- #endif
+#define MAX_PRESSED_KEYS 6
+
+#endif // KEY_MATRIX_H

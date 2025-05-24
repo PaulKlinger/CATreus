@@ -101,7 +101,7 @@ struct pressed_keys read_key_matrix(void) {
     struct pressed_keys res = {0};
     uint8_t row, col;
     if (gpio_pin_get_dt(&wake_btn)) {
-        res.keys[0].row = 3;
+        res.keys[0].row = 2;
         res.keys[0].col = 5;
         res.n_pressed = 1;
     }
@@ -113,7 +113,7 @@ struct pressed_keys read_key_matrix(void) {
                 res.keys[res.n_pressed].row = row;
                 res.keys[res.n_pressed].col = col;
                 res.n_pressed++;
-                if (res.n_pressed >= 5) {
+                if (res.n_pressed >= MAX_PRESSED_KEYS) {
                     break;
                 }
             }
