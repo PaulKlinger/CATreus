@@ -83,10 +83,10 @@ struct key_with_mod key_map_layer_2[4][11] = {
         {KEY_DELETE, 0},
         {KEY_PAGEDOWN, 0},
         {0, 0},
+        {0, 0},
         {KEY_7, 0},
         {KEY_8, 0},
         {KEY_9, 0},
-        {0, 0},
         {0, 0},
     },
     {
