@@ -18,7 +18,9 @@
 			"key_matrix.h": "c",
 			"key_layout.h": "c",
 			"hid.h": "c",
-			"stdio.h": "c"
+			"stdio.h": "c",
+			"regulator.h": "c",
+			"display.h": "c"
 		}
 	}
 }

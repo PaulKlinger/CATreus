@@ -36,6 +36,7 @@
 
 #include "display.h"
 #include "key_matrix.h"
+#include "bluetooth.h"
 
 /* 1000 msec = 1 sec */
 #define SLEEP_TIME_MS   200
@@ -50,95 +51,9 @@
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 
-static const struct device *disp_ldsw = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_ldo1));
 
 static const struct device *regulators = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_regulators));
 
-
-static const struct bt_data ad[] = {
-	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-	BT_DATA_BYTES(BT_DATA_UUID16_ALL,
-		      BT_UUID_16_ENCODE(BT_UUID_HIDS_VAL),
-		      BT_UUID_16_ENCODE(BT_UUID_BAS_VAL)),
-};
-
-static const struct bt_data sd[] = {
-	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
-};
-
-static void connected(struct bt_conn *conn, uint8_t err)
-{
-	char addr[BT_ADDR_LE_STR_LEN];
-
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-
-	if (err) {
-		printk("Failed to connect to %s, err 0x%02x %s\n", addr,
-		       err, bt_hci_err_to_str(err));
-		return;
-	}
-
-	printk("Connected %s\n", addr);
-
-	if (bt_conn_set_security(conn, BT_SECURITY_L2)) {
-		printk("Failed to set security\n");
-	}
-}
-
-static void disconnected(struct bt_conn *conn, uint8_t reason)
-{
-	char addr[BT_ADDR_LE_STR_LEN];
-
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-
-	printk("Disconnected from %s, reason 0x%02x %s\n", addr,
-	       reason, bt_hci_err_to_str(reason));
-}
-
-static void security_changed(struct bt_conn *conn, bt_security_t level,
-			     enum bt_security_err err)
-{
-	char addr[BT_ADDR_LE_STR_LEN];
-
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-
-	if (!err) {
-		printk("Security changed: %s level %u\n", addr, level);
-	} else {
-		printk("Security failed: %s level %u err %s(%d)\n", addr, level,
-		       bt_security_err_to_str(err), err);
-	}
-}
-
-BT_CONN_CB_DEFINE(conn_callbacks) = {
-	.connected = connected,
-	.disconnected = disconnected,
-	.security_changed = security_changed,
-};
-
-static void bt_ready(int err)
-{
-	if (err) {
-		printk("Bluetooth init failed (err %d)\n", err);
-		return;
-	}
-
-	printk("Bluetooth initialized\n");
-
-	hid_init();
-
-	if (IS_ENABLED(CONFIG_SETTINGS)) {
-		settings_load();
-	}
-
-	err = bt_le_adv_start(BT_LE_ADV_CONN_ONE_TIME, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
-	if (err) {
-		printk("Advertising failed to start (err %d)\n", err);
-		return;
-	}
-
-	printk("Advertising successfully started\n");
-}
 
 void i2c_scanner(const struct device *bus) {
     uint8_t error = 0u;
@@ -196,18 +111,11 @@ int main(void)
 		gpio_pin_toggle_dt(&led);
 		k_msleep(200);
 	}
-
-	ret = regulator_is_enabled(disp_ldsw);
-	if (ret) {
-		printk("display ldsw enabled, disabling\n");
-		regulator_disable(disp_ldsw);
-	} else {
-		printk("display ldsw not enabled\n");
-	}
+	disable_display();
 	
 	int err;
 
-	err = bt_enable(bt_ready);
+	err = init_bluetooth();
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
 		return 0;
@@ -223,6 +131,16 @@ int main(void)
 				printk("%d,%d ", keys.keys[i].row, keys.keys[i].col);
 			}
 			printk("\n");
+		}
+
+		if (is_waiting_for_passkey_confirmation()) {
+			if (keys.n_pressed == 1 && keys.keys[0].row == 2 && keys.keys[0].col == 2) {
+				// Confirm passkey
+				confirm_passkey();
+			} else if (keys.n_pressed == 1 && keys.keys[0].row == 1 && keys.keys[0].col == 7) {
+				// Reject passkey
+				reject_passkey();
+			}
 		}
 		struct encoded_keys encoded_keys = encode_keys(keys);
 		send_encoded_keys(encoded_keys);
@@ -242,14 +160,11 @@ int main(void)
 				printk("Should have been asleep 100ms!\n");
 				k_sleep(K_FOREVER);
 			}
-			else if (regulator_is_enabled(disp_ldsw)) {
+			else if (display_enabled()) {
 				printk("disable display\n");
-				ret = regulator_disable(disp_ldsw);
-				printk("disable display ldo ret %d\n", ret);
+				disable_display();
 			} else {
 				printk("enable display\n");
-				ret = regulator_enable(disp_ldsw);
-				k_msleep(50);
 				display_init();
 				show_debug_page();
 				printk("enable display ldo ret %d\n", ret);

@@ -6,6 +6,7 @@
 #define MAX_N_ENCODED_KEYS 6
 #define MAX_N_PRESSED_KEYS 6
 
+
 struct key_coord
 {
    uint8_t row;

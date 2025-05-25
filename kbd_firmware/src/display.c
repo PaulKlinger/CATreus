@@ -8,6 +8,7 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/regulator.h>
 
 
 const char FONT[][6] = {
@@ -143,6 +144,7 @@ const uint8_t init_sequence [] = {    // Initialization Sequence
 
 #define I2C21_NODE DT_NODELABEL(display)
 static const struct i2c_dt_spec dev_i2c = I2C_DT_SPEC_GET(I2C21_NODE);
+static const struct device *disp_ldsw = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_ldo1));
 
 #define DISPLAY_WIDTH        128
 #define DISPLAY_HEIGHT        64
@@ -252,9 +254,38 @@ void lcd_display() {
 }
 
 
+bool display_enabled(void)
+{
+    return regulator_is_enabled(disp_ldsw);
+}
+
+void enable_display(void)
+{   
+    // Don't enable display if it is already enabled
+    // (register keeps the value and would enable it again the next time it's disabled)
+    if (!display_enabled()) {
+        int ret = regulator_enable(disp_ldsw);
+        if (ret != 0) {
+            printk("Error %d: failed to enable display LDO\n", ret);
+        }
+    }
+}
+
+void disable_display(void)
+{
+    if (display_enabled()) {
+        int ret = regulator_disable(disp_ldsw);
+        if (ret != 0) {
+            printk("Error %d: failed to disable display LDO\n", ret);
+        }
+    }
+}
+
 
 void display_init(void)
 {
+    enable_display();
+    k_msleep(50);
     init_i2c();
 
     int ret = lcd_command(init_sequence, sizeof(init_sequence));

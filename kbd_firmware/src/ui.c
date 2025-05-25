@@ -63,3 +63,28 @@ void show_debug_page()
     lcd_puts(str);
     lcd_display();
 }
+
+void confirm_passkey_dialog(unsigned int passkey) {
+    if (!display_enabled()) {
+        display_init();
+    }
+    lcd_goto_xpix_y(0, 2);
+    lcd_clear_buffer();
+    char str[60];
+    sprintf(str, "pairing request\nkey: %06u\npress y/n", passkey);
+    lcd_puts(str);
+    lcd_display();
+}
+
+
+void display_passkey_dialog(unsigned int passkey) {
+    if (!display_enabled()) {
+        display_init();
+    }
+    lcd_goto_xpix_y(0, 2);
+    lcd_clear_buffer();
+    char str[30];
+    sprintf(str, "pairing request\nkey: %06u", passkey);
+    lcd_puts(str);
+    lcd_display();
+}
