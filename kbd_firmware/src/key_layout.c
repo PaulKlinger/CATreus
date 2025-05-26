@@ -6,13 +6,6 @@
 #include "usb_hid_keys.h"
 #include "key_matrix.h"
 
-enum key_layer {
-    LAYER_0 = 0,
-    LAYER_2 = 2,
-    LAYER_3 = 3,
-    LAYER_5 = 5,
-};
-
 struct key_with_mod
 {
     uint8_t key; // HID key code
@@ -160,7 +153,7 @@ struct key_with_mod key_map_layer_3[4][11] = {
     },
     {
         {0, 0},
-        {KEY_3, 0},
+        {0, 0},
         {KEY_4, KEY_MOD_LSHIFT},         // $
         {KEY_BACKSLASH, KEY_MOD_LSHIFT}, // |
         {KEY_GRAVE, KEY_MOD_LSHIFT},     //
@@ -258,9 +251,7 @@ struct key_with_mod get_key_with_mod(struct key_coord coord, enum key_layer laye
     return res;
 }
 
-struct encoded_keys encode_keys(struct pressed_keys keys) {
-    uint8_t layer = get_active_layer(keys);
-    printk("Active layer: %d\n", layer);
+struct encoded_keys encode_keys(struct pressed_keys keys, enum key_layer layer) {
     struct encoded_keys encoded = {0};
     uint8_t n_keys = 0;
     for (uint8_t i = 0; i < keys.n_pressed; i++) {
