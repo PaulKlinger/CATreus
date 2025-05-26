@@ -26,7 +26,13 @@
 			"types.h": "c",
 			"gpio.h": "c",
 			"uart.h": "c",
-			"bas.h": "c"
+			"bas.h": "c",
+			"array": "c",
+			"vector": "c",
+			"xstring": "c",
+			"string": "c",
+			"string_view": "c",
+			"xlocale": "c"
 		}
 	}
 }

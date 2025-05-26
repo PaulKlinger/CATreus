@@ -31,18 +31,11 @@
 
 #include "config.h"
 #include "key_layout.h"
-#include "hid.h"
 #include "ui.h"
 
 #include "key_matrix.h"
 #include "bluetooth.h"
 #include "leds.h"
-
-/* 1000 msec = 1 sec */
-#define SLEEP_TIME_MS   200
-
-
-
 
 void i2c_scanner(const struct device *bus) {
     uint8_t error = 0u;

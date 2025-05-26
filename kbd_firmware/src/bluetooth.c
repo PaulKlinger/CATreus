@@ -27,8 +27,80 @@
 #include <bluetooth/services/hids.h>
 #include <zephyr/bluetooth/services/dis.h>
 
+
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
+
+#define BASE_USB_HID_SPEC_VERSION   0x0101
+
+#define OUTPUT_REPORT_MAX_LEN            1
+#define OUTPUT_REPORT_BIT_MASK_CAPS_LOCK 0x02
+#define INPUT_REP_KEYS_REF_ID            0
+#define OUTPUT_REP_KEYS_REF_ID           0
+#define MODIFIER_KEY_POS                 0
+#define SHIFT_KEY_CODE                   0x02
+#define SCAN_CODE_POS                    2
+#define KEYS_MAX_LEN                    (INPUT_REPORT_KEYS_MAX_LEN - \
+					SCAN_CODE_POS)
+
+                    
+/* HIDs queue elements. */
+#define HIDS_QUEUE_SIZE 10
+
+
+/* ********************* */
+/* Buttons configuration */
+
+/* Note: The configuration below is the same as BOOT mode configuration
+ * This simplifies the code as the BOOT mode is the same as REPORT mode.
+ * Changing this configuration would require separate implementation of
+ * BOOT mode report generation.
+ */
+#define KEY_CTRL_CODE_MIN 224 /* Control key codes - required 8 of them */
+#define KEY_CTRL_CODE_MAX 231 /* Control key codes - required 8 of them */
+#define KEY_CODE_MIN      0   /* Normal key codes */
+#define KEY_CODE_MAX      101 /* Normal key codes */
+#define KEY_PRESS_MAX     6   /* Maximum number of non-control keys
+			       * pressed simultaneously
+			       */
+
+/* Number of bytes in key report
+ *
+ * 1B - control keys
+ * 1B - reserved
+ * rest - non-control keys
+ */
+#define INPUT_REPORT_KEYS_MAX_LEN (1 + 1 + KEY_PRESS_MAX)
+
+
+/* Current report map construction requires exactly 8 buttons */
+BUILD_ASSERT((KEY_CTRL_CODE_MAX - KEY_CTRL_CODE_MIN) + 1 == 8);
+
+/* OUT report internal indexes.
+ *
+ * This is a position in internal report table and is not related to
+ * report ID.
+ */
+enum {
+	OUTPUT_REP_KEYS_IDX = 0
+};
+
+/* INPUT report internal indexes.
+ *
+ * This is a position in internal report table and is not related to
+ * report ID.
+ */
+enum {
+	INPUT_REP_KEYS_IDX = 0
+};
+
+
+/* HIDS instance. */
+BT_HIDS_DEF(hids_obj,
+	    OUTPUT_REPORT_MAX_LEN,
+	    INPUT_REPORT_KEYS_MAX_LEN);
+
+
 
 static volatile bool is_adv;
 static volatile bool waiting_for_passkey_confirmation = false;
@@ -50,6 +122,7 @@ static const struct bt_data sd[] = {
 static struct bt_conn *current_conn = NULL;
 
 static struct k_work adv_work;
+
 
 static void advertising_start(void)
 {
@@ -100,6 +173,14 @@ static void connected(struct bt_conn *conn, uint8_t err)
     current_conn = bt_conn_ref(conn);
 
     printk("Connected %s\n", addr);
+
+    err = bt_hids_connected(&hids_obj, conn);
+
+	if (err) {
+		printk("Failed to notify HID service about connection\n");
+		return;
+	}
+
     is_adv = false;
     led_stop_anim();
     int ret = bt_conn_set_security(conn, BT_SECURITY_L4);
@@ -119,6 +200,11 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
     bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
 
     printk("Disconnected from %s, reason 0x%02x %s\n", addr, reason, bt_hci_err_to_str(reason));
+    int err = bt_hids_disconnected(&hids_obj, conn);
+
+	if (err) {
+		printk("Failed to notify HID service about disconnection\n");
+	}
     bt_conn_unref(current_conn);
     current_conn = NULL;
     advertising_start();
@@ -259,6 +345,91 @@ bool is_waiting_for_passkey_confirmation()
     return waiting_for_passkey_confirmation;
 }
 
+static void init_hid(void)
+{
+	int err;
+	struct bt_hids_init_param    hids_init_obj = { 0 };
+	struct bt_hids_inp_rep       *hids_inp_rep;
+	struct bt_hids_outp_feat_rep *hids_outp_rep;
+
+	static const uint8_t report_map[] = {
+		0x05, 0x01,       /* Usage Page (Generic Desktop) */
+		0x09, 0x06,       /* Usage (Keyboard) */
+		0xA1, 0x01,       /* Collection (Application) */
+
+		/* Keys */
+#if INPUT_REP_KEYS_REF_ID
+		0x85, INPUT_REP_KEYS_REF_ID,
+#endif
+		0x05, 0x07,       /* Usage Page (Key Codes) */
+		0x19, 0xe0,       /* Usage Minimum (224) */
+		0x29, 0xe7,       /* Usage Maximum (231) */
+		0x15, 0x00,       /* Logical Minimum (0) */
+		0x25, 0x01,       /* Logical Maximum (1) */
+		0x75, 0x01,       /* Report Size (1) */
+		0x95, 0x08,       /* Report Count (8) */
+		0x81, 0x02,       /* Input (Data, Variable, Absolute) */
+
+		0x95, 0x01,       /* Report Count (1) */
+		0x75, 0x08,       /* Report Size (8) */
+		0x81, 0x01,       /* Input (Constant) reserved byte(1) */
+
+		0x95, 0x06,       /* Report Count (6) */
+		0x75, 0x08,       /* Report Size (8) */
+		0x15, 0x00,       /* Logical Minimum (0) */
+		0x25, 0x65,       /* Logical Maximum (101) */
+		0x05, 0x07,       /* Usage Page (Key codes) */
+		0x19, 0x00,       /* Usage Minimum (0) */
+		0x29, 0x65,       /* Usage Maximum (101) */
+		0x81, 0x00,       /* Input (Data, Array) Key array(6 bytes) */
+
+		/* LED */
+#if OUTPUT_REP_KEYS_REF_ID
+		0x85, OUTPUT_REP_KEYS_REF_ID,
+#endif
+		0x95, 0x05,       /* Report Count (5) */
+		0x75, 0x01,       /* Report Size (1) */
+		0x05, 0x08,       /* Usage Page (Page# for LEDs) */
+		0x19, 0x01,       /* Usage Minimum (1) */
+		0x29, 0x05,       /* Usage Maximum (5) */
+		0x91, 0x02,       /* Output (Data, Variable, Absolute), */
+				  /* Led report */
+		0x95, 0x01,       /* Report Count (1) */
+		0x75, 0x03,       /* Report Size (3) */
+		0x91, 0x01,       /* Output (Data, Variable, Absolute), */
+				  /* Led report padding */
+
+		0xC0              /* End Collection (Application) */
+	};
+
+	hids_init_obj.rep_map.data = report_map;
+	hids_init_obj.rep_map.size = sizeof(report_map);
+
+	hids_init_obj.info.bcd_hid = BASE_USB_HID_SPEC_VERSION;
+	hids_init_obj.info.b_country_code = 0x00;
+	hids_init_obj.info.flags = (BT_HIDS_REMOTE_WAKE |
+				    BT_HIDS_NORMALLY_CONNECTABLE);
+
+	hids_inp_rep =
+		&hids_init_obj.inp_rep_group_init.reports[INPUT_REP_KEYS_IDX];
+	hids_inp_rep->size = INPUT_REPORT_KEYS_MAX_LEN;
+	hids_inp_rep->id = INPUT_REP_KEYS_REF_ID;
+	hids_init_obj.inp_rep_group_init.cnt++;
+
+	hids_outp_rep =
+		&hids_init_obj.outp_rep_group_init.reports[OUTPUT_REP_KEYS_IDX];
+	hids_outp_rep->size = OUTPUT_REPORT_MAX_LEN;
+	hids_outp_rep->id = OUTPUT_REP_KEYS_REF_ID;
+	hids_init_obj.outp_rep_group_init.cnt++;
+
+	hids_init_obj.is_kb = true;
+
+	err = bt_hids_init(&hids_obj, &hids_init_obj);
+	__ASSERT(err == 0, "HIDS initialization failed\n");
+}
+
+
+
 int init_bluetooth(void)
 {
     waiting_for_passkey_confirmation = false;
@@ -278,6 +449,8 @@ int init_bluetooth(void)
         return err;
     }
 
+    init_hid();
+
     err = bt_enable(NULL);
     if (err)
     {
@@ -296,4 +469,30 @@ int init_bluetooth(void)
 	k_work_init(&adv_work, adv_work_handler);
     advertising_start();
     return 0;
+}
+
+
+
+
+
+void send_encoded_keys(struct encoded_keys keys)
+{
+    /* HID Report:
+     * Byte 0: modifier mask
+     * Byte 1: reserved (must be 0)
+     * Byte 2-7: keys (up to 6 keys)
+     */
+    uint8_t report[8] = {0};
+
+    report[0] = keys.modifier_mask;
+    report[1] = 0; // reserved byte, always 0
+
+    for (int i = 0; i < MAX_N_ENCODED_KEYS; i++)
+    {
+        report[i + 2] = keys.keys[i];
+    }
+    int ret = bt_hids_inp_rep_send(&hids_obj, current_conn,
+						INPUT_REP_KEYS_IDX, report,
+						sizeof(report), NULL);
+    printk("HID report sent, ret: %d\n", ret);
 }
