@@ -39,7 +39,8 @@ static const struct bt_data ad[] = {
                   (CONFIG_BT_DEVICE_APPEARANCE >> 8) & 0xff),
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
     BT_DATA_BYTES(BT_DATA_UUID16_ALL, BT_UUID_16_ENCODE(BT_UUID_HIDS_VAL),
-                  BT_UUID_16_ENCODE(BT_UUID_BAS_VAL)),
+                  BT_UUID_16_ENCODE(BT_UUID_BAS_VAL)
+                ),
 };
 
 static const struct bt_data sd[] = {
@@ -101,9 +102,13 @@ static void connected(struct bt_conn *conn, uint8_t err)
     printk("Connected %s\n", addr);
     is_adv = false;
     led_stop_anim();
-
-    if (bt_conn_set_security(conn, BT_SECURITY_L3)) {
-		printk("Failed to set security\n");
+    int ret = bt_conn_set_security(conn, BT_SECURITY_L4);
+    if (ret) {
+		printk("Failed to set security to L4 (%d), trying L3\n", ret);
+        ret = bt_conn_set_security(conn, BT_SECURITY_L3);
+        if (ret) {
+            printk("Failed to set security to L3: %d\n", ret);
+        }
 	}
 }
 

@@ -25,6 +25,10 @@
 
 #include "key_layout.h"
 
+
+#define INPUT_REP_KEYS_REF_ID 0
+#define OUTPUT_REP_KEYS_REF_ID 0
+
 enum
 {
     HIDS_REMOTE_WAKE = BIT(0),
@@ -45,7 +49,7 @@ struct hids_report
 } __packed;
 
 static struct hids_info info = {
-    .version = 0x0000,
+    .version = 0x0101,
     .code = 0x00,
     .flags = HIDS_NORMALLY_CONNECTABLE,
 };
@@ -58,12 +62,12 @@ enum
 };
 
 static struct hids_report input = {
-    .id = 0x01,
+    .id = INPUT_REP_KEYS_REF_ID,
     .type = HIDS_INPUT,
 };
 
 static struct hids_report output = {
-    .id = 0x01,
+    .id = OUTPUT_REP_KEYS_REF_ID,
     .type = HIDS_OUTPUT,
 };
 
@@ -73,40 +77,50 @@ static uint8_t report_map[] = {
     0x05, 0x01, // Usage Page (Generic Desktop)
     0x09, 0x06, // Usage (Keyboard)
     0xA1, 0x01, // Collection (Application)
-    0x85, 0x01, // Report ID (1)
-    0x05, 0x07, // Usage Page (Key Codes)
-    0x19, 0xe0, // Usage Minimum (224)
-    0x29, 0xe7, // Usage Maximum (231)
-    0x15, 0x00, // Logical Minimum (0)
-    0x25, 0x01, // Logical Maximum (1)
-    0x75, 0x01, // Report Size (1)
-    0x95, 0x08, // Report Count (8)
-    0x81, 0x02, // Input (Data, Variable, Absolute)
 
-    0x95, 0x01, // Report Count (1)
-    0x75, 0x08, // Report Size (8)
-    0x81, 0x01, // Input (Constant) reserved byte(1)
+    /* keys */
+#if INPUT_REP_KEYS_REF_ID
+		0x85, INPUT_REP_KEYS_REF_ID,
+#endif
+		0x05, 0x07,       /* Usage Page (Key Codes) */
+		0x19, 0xe0,       /* Usage Minimum (224) */
+		0x29, 0xe7,       /* Usage Maximum (231) */
+		0x15, 0x00,       /* Logical Minimum (0) */
+		0x25, 0x01,       /* Logical Maximum (1) */
+		0x75, 0x01,       /* Report Size (1) */
+		0x95, 0x08,       /* Report Count (8) */
+		0x81, 0x02,       /* Input (Data, Variable, Absolute) */
 
-    0x95, 0x05, // Report Count (5)
-    0x75, 0x01, // Report Size (1)
-    0x05, 0x08, // Usage Page (Page# for LEDs)
-    0x19, 0x01, // Usage Minimum (1)
-    0x29, 0x05, // Usage Maximum (5)
-    0x91, 0x02, // Output (Data, Variable, Absolute), Led report
-    0x95, 0x01, // Report Count (1)
-    0x75, 0x03, // Report Size (3)
-    0x91, 0x01, // Output (Constant), Led report padding
+		0x95, 0x01,       /* Report Count (1) */
+		0x75, 0x08,       /* Report Size (8) */
+		0x81, 0x01,       /* Input (Constant) reserved byte(1) */
 
-    0x95, 0x06, // Report Count (6)
-    0x75, 0x08, // Report Size (8)
-    0x15, 0x00, // Logical Minimum (0)
-    0x25, 0x65, // Logical Maximum (101)
-    0x05, 0x07, // Usage Page (Key codes)
-    0x19, 0x00, // Usage Minimum (0)
-    0x29, 0x65, // Usage Maximum (101)
-    0x81, 0x00, // Input (Data, Array) Key array(6 bytes)
+		0x95, 0x06,       /* Report Count (6) */
+		0x75, 0x08,       /* Report Size (8) */
+		0x15, 0x00,       /* Logical Minimum (0) */
+		0x25, 0x65,       /* Logical Maximum (101) */
+		0x05, 0x07,       /* Usage Page (Key codes) */
+		0x19, 0x00,       /* Usage Minimum (0) */
+		0x29, 0x65,       /* Usage Maximum (101) */
+		0x81, 0x00,       /* Input (Data, Array) Key array(6 bytes) */
 
-    0xC0 // End Collection (Application)
+		/* LED */
+#if OUTPUT_REP_KEYS_REF_ID
+		0x85, OUTPUT_REP_KEYS_REF_ID,
+#endif
+		0x95, 0x05,       /* Report Count (5) */
+		0x75, 0x01,       /* Report Size (1) */
+		0x05, 0x08,       /* Usage Page (Page# for LEDs) */
+		0x19, 0x01,       /* Usage Minimum (1) */
+		0x29, 0x05,       /* Usage Maximum (5) */
+		0x91, 0x02,       /* Output (Data, Variable, Absolute), */
+				  /* Led report */
+		0x95, 0x01,       /* Report Count (1) */
+		0x75, 0x03,       /* Report Size (3) */
+		0x91, 0x01,       /* Output (Data, Variable, Absolute), */
+				  /* Led report padding */
+
+		0xC0              /* End Collection (Application) */
 };
 
 static ssize_t read_info(struct bt_conn *conn,
@@ -276,16 +290,18 @@ void send_encoded_keys(struct encoded_keys keys)
 {
     /* HID Report:
      * Byte 0: modifier mask
-     * Byte 1-6: keys (up to 6 keys)
+     * Byte 1: reserved (must be 0)
+     * Byte 2-7: keys (up to 6 keys)
      */
     uint8_t report[8] = {0};
 
     report[0] = keys.modifier_mask;
+    report[1] = 0; // reserved byte, always 0
 
     for (int i = 0; i < MAX_N_ENCODED_KEYS; i++)
     {
         report[i + 2] = keys.keys[i];
     }
-
-    bt_gatt_notify(NULL, &hid_keyboard_service.attrs[4], report, sizeof(report));
+    int ret = bt_gatt_notify_uuid(NULL, BT_UUID_HIDS_REPORT, hid_keyboard_service.attrs, report, sizeof(report));
+    printk("HID report sent, ret: %d\n", ret);
 }

@@ -6,6 +6,8 @@
 
 #define MAX_N_ENCODED_KEYS 6
 #define MAX_N_PRESSED_KEYS 6
+#define DEEP_SLEEP_TIMEOUT_S 60 * 30 
+
 
 
 struct key_coord

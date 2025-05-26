@@ -107,8 +107,14 @@ int main(void)
 	init_key_matrix();
 	init_ui();
 	struct pressed_keys last_pressed_keys = {0};
+	int64_t last_active_time = k_uptime_seconds();
 
 	while (1) {
+		if (k_uptime_seconds() - last_active_time > DEEP_SLEEP_TIMEOUT_S) {
+			printk("No keys pressed for %ds, going to deep sleep\n", DEEP_SLEEP_TIMEOUT_S);
+			ui_send_wake_and_key((struct key_coord){1, 6}); // S
+		}
+
 		struct pressed_keys keys = read_key_matrix();
 		if (keys.n_pressed > 0) {
 			printk("pressed keys: ");
@@ -120,6 +126,7 @@ int main(void)
 
 		printk("wake pressed: %d, n_pressed: %d\n", keys.wake_pressed, keys.n_pressed);
 		if (!eq_pressed_keys(last_pressed_keys, keys)){
+			last_active_time = k_uptime_get();
 			printk("keys changed, new n: %d\n", keys.n_pressed);
 			struct encoded_keys encoded_keys = encode_keys(keys);
 			send_encoded_keys(encoded_keys);
