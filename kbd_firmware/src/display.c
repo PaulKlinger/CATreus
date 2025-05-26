@@ -1,3 +1,4 @@
+#include "display.h"
 
 #include <errno.h>
 #include <stddef.h>
@@ -151,13 +152,13 @@ static const struct i2c_dt_spec dev_i2c = I2C_DT_SPEC_GET(I2C21_NODE);
 static const struct device *disp_ldsw =
     DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_ldo1));
 
-#define DISPLAY_WIDTH 128
-#define DISPLAY_HEIGHT 64
+
 static struct {
     uint8_t x;
     uint8_t y;
 } cursorPosition;
-uint8_t displayBuffer[DISPLAY_HEIGHT / 8][DISPLAY_WIDTH];
+
+uint8_t displayBuffer[DISPLAY_HEIGHT/8][DISPLAY_WIDTH];
 
 void init_i2c(void) {
     while (!device_is_ready(dev_i2c.bus)) {
@@ -216,9 +217,15 @@ void lcd_gotoxy(uint8_t x, uint8_t y) {
     lcd_goto_xpix_y(x, y);
 }
 
-void send_home_command() {
-    uint8_t commandSequence[] = {0x22, 0, 0x07, 0x21, 0, 0x7f};
+void lcd_send_goto_xpix_y(uint8_t x, uint8_t y) {
+    cursorPosition.x = x;
+    cursorPosition.y = y;
+    uint8_t commandSequence[] = {0x22, y, 0x07, 0x21, x, 0x7f};
     lcd_command(commandSequence, sizeof(commandSequence));
+}
+
+void lcd_send_home_command() {
+    lcd_send_goto_xpix_y(0, 0);
 }
 
 void lcd_putc(char c) {
@@ -252,7 +259,7 @@ void lcd_clear_buffer() {
 }
 
 void lcd_display() {
-    send_home_command();
+    lcd_send_home_command();
     lcd_data(&displayBuffer[0][0], DISPLAY_WIDTH * DISPLAY_HEIGHT / 8);
 }
 
@@ -280,6 +287,7 @@ void disable_display(void) {
 }
 
 void display_init(void) {
+    lcd_clear_buffer();
     enable_display();
     k_msleep(50);
     init_i2c();
@@ -289,4 +297,21 @@ void display_init(void) {
         printk("Error %d: failed to write to the display\n", ret);
     }
     lcd_display();
+}
+
+void lcd_drawPixel(uint8_t x, uint8_t y, uint8_t color){
+    if( color == WHITE){
+        displayBuffer[(y / (DISPLAY_HEIGHT/8))][x] |= (1 << (y % (DISPLAY_HEIGHT/8)));
+    } else {
+        displayBuffer[(y / (DISPLAY_HEIGHT/8))][x] &= ~(1 << (y % (DISPLAY_HEIGHT/8)));
+    }
+}
+
+void lcd_display_block(uint8_t x, uint8_t line, uint8_t width) {
+    if (line > (DISPLAY_HEIGHT/8-1) || x > DISPLAY_WIDTH - 1){return;}
+    if (x + width > DISPLAY_WIDTH) { // no -1 here, x alone is width 1
+        width = DISPLAY_WIDTH - x;
+    }
+    lcd_send_goto_xpix_y(x,line);
+    lcd_data(&displayBuffer[line][x], width);
 }

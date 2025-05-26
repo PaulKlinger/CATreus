@@ -16,10 +16,12 @@ void ui_send_confirm_passkey(unsigned int passkey);
 
 void ui_send_display_passkey(unsigned int passkey);
 
-void ui_send_pairing();
-
 bool ui_active();
 
 void init_ui();
+
+void suspend_ui();
+
+void resume_ui();
 
 #endif // UI_H

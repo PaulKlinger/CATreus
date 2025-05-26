@@ -30,6 +30,7 @@
 
 K_THREAD_STACK_DEFINE(ui_thread_stack, THREAD_STACK_SIZE);
 struct k_thread ui_thread_data;
+k_tid_t ui_thread_id;
 
 struct ui_message {
     enum ui_message_type {
@@ -317,11 +318,19 @@ void ui_thread() {
     }
 }
 
+void suspend_ui() {
+    k_thread_suspend(ui_thread_id);
+}
+
+void resume_ui() {
+    k_thread_resume(ui_thread_id);
+}
+
 void init_ui(void) {
     k_msgq_init(&ui_messages, ui_message_buffer, sizeof(struct ui_message), 10);
     disable_display();
     init_ui_page_cfg();
-    k_thread_create(&ui_thread_data, ui_thread_stack,
+    ui_thread_id = k_thread_create(&ui_thread_data, ui_thread_stack,
                     K_THREAD_STACK_SIZEOF(ui_thread_stack), ui_thread, NULL,
                     NULL, NULL, PRIORITY, 0, K_NO_WAIT);
 };

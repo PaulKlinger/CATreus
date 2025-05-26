@@ -32,7 +32,9 @@
 			"xstring": "c",
 			"string": "c",
 			"string_view": "c",
-			"xlocale": "c"
+			"xlocale": "c",
+			"mandelbrot.h": "c",
+			"bluetooth.h": "c"
 		}
 	}
 }
