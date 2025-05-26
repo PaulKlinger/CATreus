@@ -100,11 +100,6 @@ void init_key_matrix(void) {
 struct pressed_keys read_key_matrix(void) {
     struct pressed_keys res = {0};
     uint8_t row, col;
-    if (gpio_pin_get_dt(&wake_btn)) {
-        res.keys[0].row = 2;
-        res.keys[0].col = 5;
-        res.n_pressed = 1;
-    }
     
     for (col = 0; col < ARRAY_SIZE(gpio_cols); col++) {
         gpio_pin_set_dt(&gpio_cols[col], 1);

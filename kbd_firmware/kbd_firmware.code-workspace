@@ -20,7 +20,11 @@
 			"hid.h": "c",
 			"stdio.h": "c",
 			"regulator.h": "c",
-			"display.h": "c"
+			"display.h": "c",
+			"printk.h": "c",
+			"sensor.h": "c",
+			"types.h": "c",
+			"gpio.h": "c"
 		}
 	}
 }

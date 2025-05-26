@@ -1,8 +1,23 @@
 #ifndef UI_H
 #define UI_H
 
-void show_debug_page(void);
-void confirm_passkey_dialog(unsigned int passkey);
-void display_passkey_dialog(unsigned int passkey);
+#include <stdbool.h>
+#include "config.h"
+
+void ui_send_wake_and_key(struct key_coord key);
+
+void ui_send_key(struct key_coord key);
+
+void ui_send_startup();
+
+void ui_send_wake();
+
+void ui_send_confirm_passkey(unsigned int passkey);
+
+void ui_send_display_passkey(unsigned int passkey);
+
+bool ui_active();
+
+void init_ui();
 
 #endif // UI_H

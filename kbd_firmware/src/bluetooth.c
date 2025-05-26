@@ -147,7 +147,7 @@ static void auth_passkey_display(struct bt_conn *conn, unsigned int passkey)
         if (current_conn) {bt_conn_unref(current_conn);}
         current_conn = bt_conn_ref(conn);
     }
-    display_passkey_dialog(passkey);
+    ui_send_display_passkey(passkey);
 }
 
 static void auth_passkey_confirm(struct bt_conn *conn, unsigned int passkey)
@@ -158,7 +158,7 @@ static void auth_passkey_confirm(struct bt_conn *conn, unsigned int passkey)
         current_conn = bt_conn_ref(conn);
     }
     waiting_for_passkey_confirmation = true;
-    confirm_passkey_dialog(passkey);
+    ui_send_confirm_passkey(passkey);
 }
 
 static void auth_cancel(struct bt_conn *conn)

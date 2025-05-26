@@ -1,61 +1,143 @@
 #include "ui.h"
 
-#include <zephyr/types.h>
+#include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <errno.h>
-#include <zephyr/sys/printk.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/regulator.h>
 #include <zephyr/drivers/sensor/npm1300_charger.h>
 #include <zephyr/drivers/uart.h>
-#include <zephyr/drivers/gpio.h>
-#include <zephyr/drivers/regulator.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/types.h>
 
-#include <zephyr/drivers/i2c.h>
-
+#include "bluetooth.h"
+#include "config.h"
 #include "display.h"
+#include "pmic.h"
 
-static const struct device *charger = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_charger));
+#define THREAD_STACK_SIZE 1024
+#define PRIORITY 5
+#define UI_TIME_STEP_MS 100
+#define UI_TIMEOUT_MS 10000
 
-int get_charger_attr(enum sensor_channel channel, enum sensor_attribute attr, struct sensor_value *val)
-{
-    int ret = sensor_attr_get(charger, channel, attr, val);
-    if (ret)
-    {
-        printk("charger attr get failed %d\n", ret);
-    }
-    return ret;
+// ----------------------------------------------------
+// Thread & queue defs
+
+K_THREAD_STACK_DEFINE(ui_thread_stack, THREAD_STACK_SIZE);
+struct k_thread ui_thread_data;
+
+struct ui_message {
+    enum ui_message_type {
+        UI_MESSAGE_TYPE_STARTUP,
+        UI_MESSAGE_TYPE_WAKE_PRESSED,
+        UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED,
+        UI_MESSAGE_TYPE_KEY_PRESSED,  // only sent if ui is active
+        UI_MESSAGE_TYPE_CONFIRM_PASSKEY,
+        UI_MESSAGE_TYPE_DISPLAY_PASSKEY,
+        // to indicate a page is not triggered by a message
+        UI_MESSAGE_TYPE_NOMSG,
+    } type;
+    union {
+        struct key_coord key;
+        unsigned int passkey;
+    } data;
+};
+
+char ui_message_buffer[10 * sizeof(struct ui_message)];
+struct k_msgq ui_messages;
+
+// ----------------------------------------------------
+// functions to send to queue
+
+void ui_send_wake_and_key(struct key_coord key) {
+    struct ui_message msg;
+    msg.type = UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED;
+    msg.data.key = key;
+    k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
 }
 
-int get_charger_channel(enum sensor_channel channel, struct sensor_value *val)
-{
-    int ret = sensor_channel_get(charger, channel, val);
-    if (ret)
-    {
-        printk("charger channel get failed %d\n", ret);
-    }
-    return ret;
+void ui_send_key(struct key_coord key) {
+    struct ui_message msg;
+    msg.type = UI_MESSAGE_TYPE_KEY_PRESSED;
+    msg.data.key = key;
+    k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
 }
 
-void show_debug_page()
-{
+void ui_send_startup() {
+    struct ui_message msg;
+    msg.type = UI_MESSAGE_TYPE_STARTUP;
+    k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
+}
 
-    struct sensor_value val;
-    sensor_sample_fetch(charger);
-    get_charger_attr(SENSOR_CHAN_NPM1300_CHARGER_VBUS_STATUS, SENSOR_ATTR_NPM1300_CHARGER_VBUS_PRESENT, &val);
-    int32_t vbus_present = val.val1;
-    get_charger_channel(SENSOR_CHAN_NPM1300_CHARGER_STATUS, &val);
-    int32_t charger_status = val.val1;
-    get_charger_channel(SENSOR_CHAN_NPM1300_CHARGER_ERROR, &val);
-    int32_t charger_error = val.val1;
-    get_charger_channel(SENSOR_CHAN_GAUGE_AVG_CURRENT, &val);
-    char current[6];
-    gcvt((float)val.val1 * 1000.f + ((float)val.val2) / 1000.0f, 4, current);
-    get_charger_channel(SENSOR_CHAN_GAUGE_VOLTAGE, &val);
-    char voltage[6];
-    gcvt((float)val.val1 + ((float)val.val2) / 1000000.0f, 4, voltage);
-    char str[100];
-    sprintf(str, "usb %d s %d e %d \n %smA %sV \n", vbus_present, charger_status, charger_error, current, voltage);
+
+void ui_send_wake() {
+    printk("sending wake message\n");
+    struct ui_message msg;
+    msg.type = UI_MESSAGE_TYPE_WAKE_PRESSED;
+    int ret = k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
+    printk("sent msg, ret: %d\n", ret);
+}
+
+void ui_send_confirm_passkey(unsigned int passkey) {
+    struct ui_message msg;
+    msg.type = UI_MESSAGE_TYPE_CONFIRM_PASSKEY;
+    msg.data.passkey = passkey;
+    k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
+}
+
+void ui_send_display_passkey(unsigned int passkey) {
+    struct ui_message msg;
+    msg.type = UI_MESSAGE_TYPE_DISPLAY_PASSKEY;
+    msg.data.passkey = passkey;
+    k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
+}
+
+// state definitions
+
+enum ui_page {
+    UI_DISABLED = 0,
+    UI_PAGE_STARTUP = 1,
+    UI_PAGE_SHUTDOWN = 2,
+    UI_PAGE_DEBUG = 3,
+    UI_PAGE_CONFIRM_PASSKEY = 4,
+    UI_PAGE_DISPLAY_PASSKEY = 5,
+    UI_PAGE_WAKEUP = 6,
+    __UI_N_PAGES = 7,
+};
+union ui_page_state {
+    uint32_t frame_idx;
+    unsigned int passkey;
+};
+
+struct ui_state {
+    enum ui_page current_page;
+    union ui_page_state page_state;
+    int64_t last_msg_time;
+};
+
+void open_page(struct ui_state *state, enum ui_page new_page) {
+    printk("switching page to %d", new_page);
+    state->current_page = new_page;
+    state->page_state = (union ui_page_state){0};
+}
+
+// ----------------------------------------------------
+// page implementations
+// TODO: move to separate files
+
+
+void show_debug_page(struct ui_message msg, struct ui_state *state) {
+    struct pmic_state pmic_state = get_pmic_state();
+
+    char str[60];
+    sprintf(str, "usb %d s %d e %d \n %1.3fmA %1.3fV", pmic_state.vbus_present,
+            pmic_state.charger_status, pmic_state.charger_error,
+            (double) pmic_state.battery_current, (double) pmic_state.battery_voltage);
     printk("%s", str);
 
     lcd_goto_xpix_y(0, 0);
@@ -64,23 +146,37 @@ void show_debug_page()
     lcd_display();
 }
 
-void confirm_passkey_dialog(unsigned int passkey) {
-    if (!display_enabled()) {
-        display_init();
+void show_confirm_passkey_page(struct ui_message msg, struct ui_state *state) {
+    if (msg.type == UI_MESSAGE_TYPE_CONFIRM_PASSKEY) {
+        state->page_state.passkey = msg.data.passkey;
     }
-    lcd_goto_xpix_y(0, 2);
-    lcd_clear_buffer();
     char str[60];
-    sprintf(str, "pairing request\nkey: %06u\npress y/n", passkey);
-    lcd_puts(str);
-    lcd_display();
+    
+    lcd_clear_buffer();
+
+    if (is_waiting_for_passkey_confirmation()) {
+        if (msg.type == UI_MESSAGE_TYPE_KEY_PRESSED && msg.data.key.row == 2 &&
+            msg.data.key.col == 2) {
+            // Confirm passkey
+            confirm_passkey();
+        } else if (msg.type == UI_MESSAGE_TYPE_KEY_PRESSED &&
+                   msg.data.key.row == 1 && msg.data.key.col == 7) {
+            // Reject passkey
+            reject_passkey();
+        } 
+        sprintf(str, "pairing request\nkey: %06u\n\npress y/n", state->page_state.passkey);
+        lcd_goto_xpix_y(0, 2);
+        lcd_puts(str);
+        lcd_display();
+    } else {
+        // not too sure here, this means one UI cycle delay
+        // sending a message instead would be immediate, but semantically dubious
+        open_page(state, UI_PAGE_WAKEUP);
+    }
 }
 
-
-void display_passkey_dialog(unsigned int passkey) {
-    if (!display_enabled()) {
-        display_init();
-    }
+void show_display_passkey_page(struct ui_message msg, struct ui_state *state) {
+    unsigned int passkey = msg.data.passkey;
     lcd_goto_xpix_y(0, 2);
     lcd_clear_buffer();
     char str[30];
@@ -88,3 +184,131 @@ void display_passkey_dialog(unsigned int passkey) {
     lcd_puts(str);
     lcd_display();
 }
+
+void show_startup_page(struct ui_message msg, struct ui_state *state) {
+    lcd_goto_xpix_y(0, 3);
+    lcd_clear_buffer();
+    lcd_puts("Starting...");
+    lcd_display();
+}
+
+void show_shutdown_page(struct ui_message msg, struct ui_state *state) {
+    lcd_goto_xpix_y(0, 3);
+    lcd_clear_buffer();
+    lcd_puts("Shutting down...");
+    lcd_display();
+    k_msleep(500);
+    enter_ship_mode();
+}
+
+void show_wakeup_page(struct ui_message msg, struct ui_state *state) {
+    lcd_goto_xpix_y(5, 3);
+    lcd_clear_buffer();
+    lcd_puts("^ _ ^");
+    lcd_display();
+}
+
+
+struct ui_page_cfg {
+    void (*show)(struct ui_message, struct ui_state *state);
+    enum ui_message_type
+        trigger_msg;               // type of message that triggers this page
+    struct key_coord trigger_key;  // press wake + trigger_key to show this page
+};
+struct ui_page_cfg ui_page_cfgs[__UI_N_PAGES];
+
+#define NO_KEY \
+    {42, 42}   \
+    // No key defined, used for pages that don't require a key press to show
+void init_ui_page_cfg() {
+    ui_page_cfgs[UI_DISABLED] =
+        (struct ui_page_cfg){NULL, UI_MESSAGE_TYPE_NOMSG, NO_KEY};
+    ui_page_cfgs[UI_PAGE_STARTUP] = (struct ui_page_cfg){
+        show_startup_page, UI_MESSAGE_TYPE_STARTUP, NO_KEY};
+    ui_page_cfgs[UI_PAGE_SHUTDOWN] = (struct ui_page_cfg){
+        show_shutdown_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {1, 6}};
+    ui_page_cfgs[UI_PAGE_DEBUG] = (struct ui_page_cfg){
+        show_debug_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {1, 10}};
+    ui_page_cfgs[UI_PAGE_CONFIRM_PASSKEY] = (struct ui_page_cfg){
+        show_confirm_passkey_page, UI_MESSAGE_TYPE_CONFIRM_PASSKEY, NO_KEY};
+    ui_page_cfgs[UI_PAGE_DISPLAY_PASSKEY] = (struct ui_page_cfg){
+        show_display_passkey_page, UI_MESSAGE_TYPE_DISPLAY_PASSKEY, NO_KEY};
+    ui_page_cfgs[UI_PAGE_WAKEUP] = (struct ui_page_cfg){
+        show_wakeup_page, UI_MESSAGE_TYPE_WAKE_PRESSED, NO_KEY};
+};
+
+void switch_page(struct ui_state *state, struct ui_message *msg) {
+    for (int i = 0; i < __UI_N_PAGES; i++) {
+        struct ui_page_cfg cfg = ui_page_cfgs[i];
+        if (cfg.trigger_msg == msg->type &&
+            ((cfg.trigger_key.row == 42 && cfg.trigger_key.col == 42) ||
+             (cfg.trigger_key.row == msg->data.key.row &&
+              cfg.trigger_key.col == msg->data.key.col))) {
+            if (state->current_page != i) {
+                open_page(state, (enum ui_page) i);
+            }
+            break;
+        }
+    }
+}
+
+static struct ui_state current_ui_state;
+
+bool ui_active() {
+    return current_ui_state.current_page != UI_DISABLED;
+}
+
+void ui_thread() {
+    current_ui_state = (struct ui_state) {
+        .current_page = UI_DISABLED,
+        .page_state = {0},
+        .last_msg_time = k_uptime_get(),
+    };
+    struct ui_state *state = &current_ui_state;
+    struct ui_message msg;
+
+    int ret;
+    while (1) {
+        printk("ui loop\n");
+        if (state->current_page != UI_DISABLED) {
+            // if the display is active update every UI_TIMESTEMP_MS
+            ret = k_msgq_get(&ui_messages, &msg, K_MSEC(UI_TIME_STEP_MS));
+        } else {
+            // else sleep until we get a ui message
+            ret = k_msgq_get(&ui_messages, &msg, K_FOREVER);
+        }
+        if (ret == 0) {
+            printk("Got ui message, type: %d\n", msg.type);
+            // got a message, make sure display is on
+            if (state->current_page == UI_DISABLED) {
+                display_init();
+            }
+            printk("setting uptime");
+            state->last_msg_time = k_uptime_get();
+
+
+            if ((state->current_page == UI_DISABLED) ||
+                (state->current_page == UI_PAGE_WAKEUP)) {
+                switch_page(state, &msg);
+            }
+        }
+        if (k_uptime_get() - state->last_msg_time > UI_TIMEOUT_MS) {
+            disable_display();
+            // TODO: ui sleep page?
+            state->current_page = UI_DISABLED;
+            continue;
+        }
+        if (state->current_page != UI_DISABLED) {
+            ui_page_cfgs[state->current_page].show(msg, state);
+        }
+    }
+}
+
+void init_ui(void) {
+    k_msgq_init(&ui_messages, ui_message_buffer, sizeof(struct ui_message), 10);
+    disable_display();
+    init_ui_page_cfg();
+    k_thread_create(&ui_thread_data, ui_thread_stack,
+                    K_THREAD_STACK_SIZEOF(ui_thread_stack), ui_thread, NULL,
+                    NULL, NULL, PRIORITY, 0, K_NO_WAIT);
+};

@@ -34,7 +34,6 @@
 #include "hid.h"
 #include "ui.h"
 
-#include "display.h"
 #include "key_matrix.h"
 #include "bluetooth.h"
 
@@ -51,8 +50,6 @@
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 
-
-static const struct device *regulators = DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_regulators));
 
 
 void i2c_scanner(const struct device *bus) {
@@ -111,7 +108,6 @@ int main(void)
 		gpio_pin_toggle_dt(&led);
 		k_msleep(200);
 	}
-	disable_display();
 	
 	int err;
 
@@ -123,6 +119,9 @@ int main(void)
 
 	printk("Init key matrix\n");
 	init_key_matrix();
+	init_ui();
+	bool last_wake_state = false;
+
 	while (1) {
 		struct pressed_keys keys = read_key_matrix();
 		if (keys.n_pressed > 0) {
@@ -133,44 +132,21 @@ int main(void)
 			printk("\n");
 		}
 
-		if (is_waiting_for_passkey_confirmation()) {
-			if (keys.n_pressed == 1 && keys.keys[0].row == 2 && keys.keys[0].col == 2) {
-				// Confirm passkey
-				confirm_passkey();
-			} else if (keys.n_pressed == 1 && keys.keys[0].row == 1 && keys.keys[0].col == 7) {
-				// Reject passkey
-				reject_passkey();
-			}
-		}
 		struct encoded_keys encoded_keys = encode_keys(keys);
 		send_encoded_keys(encoded_keys);
 
-
+		
 		if (wake_pressed()) {
-			if (keys.keys[1].row == 1 && keys.keys[1].col == 6) {
-				while (wake_pressed()) {
-					k_msleep(10);
-				}
-				k_msleep(100);
-				printk("Going to sleep (ship mode)\n");
-				ret = regulator_parent_ship_mode(regulators);
-				printk("ship mode ret %d\n", ret);
-				printk("Should be asleep!\n");
-				k_msleep(100);
-				printk("Should have been asleep 100ms!\n");
-				k_sleep(K_FOREVER);
+			if (keys.n_pressed > 0) {
+				ui_send_wake_and_key(keys.keys[0]);
+			} else if (!last_wake_state) {
+				ui_send_wake();
 			}
-			else if (display_enabled()) {
-				printk("disable display\n");
-				disable_display();
-			} else {
-				printk("enable display\n");
-				display_init();
-				show_debug_page();
-				printk("enable display ldo ret %d\n", ret);
-				// TODO: UI thread
-			}
+		} else if (ui_active() && keys.n_pressed > 0) {
+			ui_send_key(keys.keys[0]);
 		}
+		last_wake_state = wake_pressed();
+
 		if (keys.n_pressed > 0) {
 			// if keys are pressed always sleep for 50ms
 			// (we can't use the level interrupt here)
