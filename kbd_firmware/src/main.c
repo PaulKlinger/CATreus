@@ -36,18 +36,10 @@
 
 #include "key_matrix.h"
 #include "bluetooth.h"
+#include "leds.h"
 
 /* 1000 msec = 1 sec */
 #define SLEEP_TIME_MS   200
-
-/* The devicetree node identifier for the "led0" alias. */
-#define LED0_NODE DT_NODELABEL(led0)
-
-/*
- * A build error on this line means your board is unsupported.
- * See the sample documentation for information on how to fix this.
- */
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 
 
@@ -93,20 +85,14 @@ void i2c_scanner(const struct device *bus) {
 int main(void)
 {
 	int ret;
-	if (!gpio_is_ready_dt(&led)) {
-		return 0;
-	}
-	
 	printk("Starting wrls atreus\n");
+	init_leds();
 
-	ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
-	if (ret < 0) {
-		return 0;
-	}
-
-	for (int i = 0; i < 5; i++) {
-		gpio_pin_toggle_dt(&led);
-		k_msleep(200);
+	for (int i = 0; i < 2; i++) {
+		led_on(0);
+		k_msleep(100);
+		led_off(0);
+		k_msleep(100);
 	}
 	
 	int err;
@@ -150,7 +136,7 @@ int main(void)
 		}
 		last_pressed_keys = keys;
 
-		if (keys.n_pressed > 0) {
+		if (keys.n_pressed > 0 || keys.wake_pressed) {
 			// if keys are pressed always sleep for 50ms
 			// (we can't use the level interrupt here)
 			// TODO: could switch to edge interrupt in this case??

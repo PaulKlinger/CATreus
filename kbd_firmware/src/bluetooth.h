@@ -4,7 +4,8 @@
 
 #include <stdbool.h>
 
-bool is_advertising();
+bool ble_is_advertising();
+bool ble_is_connected();
 
 bool is_waiting_for_passkey_confirmation();
 void confirm_passkey();

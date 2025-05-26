@@ -24,7 +24,9 @@
 			"printk.h": "c",
 			"sensor.h": "c",
 			"types.h": "c",
-			"gpio.h": "c"
+			"gpio.h": "c",
+			"uart.h": "c",
+			"bas.h": "c"
 		}
 	}
 }

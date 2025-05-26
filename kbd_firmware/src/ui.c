@@ -2,8 +2,8 @@
 
 #include <errno.h>
 #include <stddef.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
@@ -39,6 +39,7 @@ struct ui_message {
         UI_MESSAGE_TYPE_KEY_PRESSED,  // only sent if ui is active
         UI_MESSAGE_TYPE_CONFIRM_PASSKEY,
         UI_MESSAGE_TYPE_DISPLAY_PASSKEY,
+        UI_MESSAGE_TYPE_PAIRING,
         // to indicate a page is not triggered by a message
         UI_MESSAGE_TYPE_NOMSG,
     } type;
@@ -54,47 +55,54 @@ struct k_msgq ui_messages;
 // ----------------------------------------------------
 // functions to send to queue
 
+void send_ui_message(struct ui_message msg) {
+    int ret = k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
+    if (ret != 0) {
+        printk("Error %d: failed to send UI message\n", ret);
+    } else {
+        printk("UI message sent: type %d\n", msg.type);
+    }
+}
+
 void ui_send_wake_and_key(struct key_coord key) {
     struct ui_message msg;
     msg.type = UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED;
     msg.data.key = key;
-    k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
+    send_ui_message(msg);
 }
 
 void ui_send_key(struct key_coord key) {
     struct ui_message msg;
     msg.type = UI_MESSAGE_TYPE_KEY_PRESSED;
     msg.data.key = key;
-    k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
+    send_ui_message(msg);
 }
 
 void ui_send_startup() {
     struct ui_message msg;
     msg.type = UI_MESSAGE_TYPE_STARTUP;
-    k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
+    send_ui_message(msg);
 }
-
 
 void ui_send_wake() {
     printk("sending wake message\n");
     struct ui_message msg;
     msg.type = UI_MESSAGE_TYPE_WAKE_PRESSED;
-    int ret = k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
-    printk("sent msg, ret: %d\n", ret);
+    send_ui_message(msg);
 }
 
 void ui_send_confirm_passkey(unsigned int passkey) {
     struct ui_message msg;
     msg.type = UI_MESSAGE_TYPE_CONFIRM_PASSKEY;
     msg.data.passkey = passkey;
-    k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
+    send_ui_message(msg);
 }
 
 void ui_send_display_passkey(unsigned int passkey) {
     struct ui_message msg;
     msg.type = UI_MESSAGE_TYPE_DISPLAY_PASSKEY;
     msg.data.passkey = passkey;
-    k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
+    send_ui_message(msg);
 }
 
 // state definitions
@@ -130,15 +138,17 @@ void open_page(struct ui_state *state, enum ui_page new_page) {
 // page implementations
 // TODO: move to separate files
 
-
 void show_debug_page(struct ui_message msg, struct ui_state *state) {
     struct pmic_state pmic_state = get_pmic_state();
+    int64_t uptime = k_uptime_get();
 
-    char str[60];
-    sprintf(str, "usb %d s %d e %d \n %1.3fmA %1.3fV", pmic_state.vbus_present,
-            pmic_state.charger_status, pmic_state.charger_error,
-            (double) pmic_state.battery_current, (double) pmic_state.battery_voltage);
-    printk("%s", str);
+    char str[80];
+    sprintf(str,
+            "usb %d s %d e %d \n %1.0fmA %1.3fV\nconn: %d\nuptime: %4lldm %2llds ",
+            pmic_state.vbus_present, pmic_state.charger_status,
+            pmic_state.charger_error, (double)pmic_state.battery_current,
+            (double)pmic_state.battery_voltage, ble_is_connected(),
+            uptime / 60000, uptime % 60000 / 1000);
 
     lcd_goto_xpix_y(0, 0);
     lcd_clear_buffer();
@@ -151,7 +161,7 @@ void show_confirm_passkey_page(struct ui_message msg, struct ui_state *state) {
         state->page_state.passkey = msg.data.passkey;
     }
     char str[60];
-    
+
     lcd_clear_buffer();
 
     if (is_waiting_for_passkey_confirmation()) {
@@ -163,14 +173,16 @@ void show_confirm_passkey_page(struct ui_message msg, struct ui_state *state) {
                    msg.data.key.row == 1 && msg.data.key.col == 7) {
             // Reject passkey
             reject_passkey();
-        } 
-        sprintf(str, "pairing request\nkey: %06u\n\npress y/n", state->page_state.passkey);
+        }
+        sprintf(str, "pairing request\nkey: %06u\n\npress y/n",
+                state->page_state.passkey);
         lcd_goto_xpix_y(0, 2);
         lcd_puts(str);
         lcd_display();
     } else {
         // not too sure here, this means one UI cycle delay
-        // sending a message instead would be immediate, but semantically dubious
+        // sending a message instead would be immediate, but semantically
+        // dubious
         open_page(state, UI_PAGE_WAKEUP);
     }
 }
@@ -202,18 +214,18 @@ void show_shutdown_page(struct ui_message msg, struct ui_state *state) {
 }
 
 void show_wakeup_page(struct ui_message msg, struct ui_state *state) {
-    lcd_goto_xpix_y(5, 3);
+    lcd_goto_xpix_y(50, 3);
     lcd_clear_buffer();
     lcd_puts("^ _ ^");
     lcd_display();
 }
-
 
 struct ui_page_cfg {
     void (*show)(struct ui_message, struct ui_state *state);
     enum ui_message_type
         trigger_msg;               // type of message that triggers this page
     struct key_coord trigger_key;  // press wake + trigger_key to show this page
+    bool allow_navigation;  // if true, respond to triggers of other pages
 };
 struct ui_page_cfg ui_page_cfgs[__UI_N_PAGES];
 
@@ -222,19 +234,24 @@ struct ui_page_cfg ui_page_cfgs[__UI_N_PAGES];
     // No key defined, used for pages that don't require a key press to show
 void init_ui_page_cfg() {
     ui_page_cfgs[UI_DISABLED] =
-        (struct ui_page_cfg){NULL, UI_MESSAGE_TYPE_NOMSG, NO_KEY};
+        (struct ui_page_cfg){NULL, UI_MESSAGE_TYPE_NOMSG, NO_KEY, true};
     ui_page_cfgs[UI_PAGE_STARTUP] = (struct ui_page_cfg){
-        show_startup_page, UI_MESSAGE_TYPE_STARTUP, NO_KEY};
-    ui_page_cfgs[UI_PAGE_SHUTDOWN] = (struct ui_page_cfg){
-        show_shutdown_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {1, 6}};
+        show_startup_page, UI_MESSAGE_TYPE_STARTUP, NO_KEY, false};
+    ui_page_cfgs[UI_PAGE_SHUTDOWN] =
+        (struct ui_page_cfg){show_shutdown_page,
+                             UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED,
+                             {1, 6},
+                             false};
     ui_page_cfgs[UI_PAGE_DEBUG] = (struct ui_page_cfg){
-        show_debug_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {1, 10}};
-    ui_page_cfgs[UI_PAGE_CONFIRM_PASSKEY] = (struct ui_page_cfg){
-        show_confirm_passkey_page, UI_MESSAGE_TYPE_CONFIRM_PASSKEY, NO_KEY};
-    ui_page_cfgs[UI_PAGE_DISPLAY_PASSKEY] = (struct ui_page_cfg){
-        show_display_passkey_page, UI_MESSAGE_TYPE_DISPLAY_PASSKEY, NO_KEY};
+        show_debug_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {1, 10}, true};
+    ui_page_cfgs[UI_PAGE_CONFIRM_PASSKEY] =
+        (struct ui_page_cfg){show_confirm_passkey_page,
+                             UI_MESSAGE_TYPE_CONFIRM_PASSKEY, NO_KEY, false};
+    ui_page_cfgs[UI_PAGE_DISPLAY_PASSKEY] =
+        (struct ui_page_cfg){show_display_passkey_page,
+                             UI_MESSAGE_TYPE_DISPLAY_PASSKEY, NO_KEY, true};
     ui_page_cfgs[UI_PAGE_WAKEUP] = (struct ui_page_cfg){
-        show_wakeup_page, UI_MESSAGE_TYPE_WAKE_PRESSED, NO_KEY};
+        show_wakeup_page, UI_MESSAGE_TYPE_WAKE_PRESSED, NO_KEY, true};
 };
 
 void switch_page(struct ui_state *state, struct ui_message *msg) {
@@ -245,7 +262,7 @@ void switch_page(struct ui_state *state, struct ui_message *msg) {
              (cfg.trigger_key.row == msg->data.key.row &&
               cfg.trigger_key.col == msg->data.key.col))) {
             if (state->current_page != i) {
-                open_page(state, (enum ui_page) i);
+                open_page(state, (enum ui_page)i);
             }
             break;
         }
@@ -254,12 +271,10 @@ void switch_page(struct ui_state *state, struct ui_message *msg) {
 
 static struct ui_state current_ui_state;
 
-bool ui_active() {
-    return current_ui_state.current_page != UI_DISABLED;
-}
+bool ui_active() { return current_ui_state.current_page != UI_DISABLED; }
 
 void ui_thread() {
-    current_ui_state = (struct ui_state) {
+    current_ui_state = (struct ui_state){
         .current_page = UI_DISABLED,
         .page_state = {0},
         .last_msg_time = k_uptime_get(),
@@ -286,9 +301,7 @@ void ui_thread() {
             printk("setting uptime");
             state->last_msg_time = k_uptime_get();
 
-
-            if ((state->current_page == UI_DISABLED) ||
-                (state->current_page == UI_PAGE_WAKEUP)) {
+            if (ui_page_cfgs[state->current_page].allow_navigation) {
                 switch_page(state, &msg);
             }
         }

@@ -1,6 +1,7 @@
 #include "bluetooth.h"
 #include "config.h"
 #include "ui.h"
+#include "leds.h"
 
 #include <zephyr/types.h>
 #include <stddef.h>
@@ -80,6 +81,7 @@ static void adv_work_handler(struct k_work *work)
     }
 
     is_adv = true;
+    led_start_advertising_anim();
     printk("Advertising successfully started\n");
 }
 
@@ -98,6 +100,7 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
     printk("Connected %s\n", addr);
     is_adv = false;
+    led_stop_anim();
 
     if (bt_conn_set_security(conn, BT_SECURITY_L3)) {
 		printk("Failed to set security\n");
@@ -236,9 +239,14 @@ void reject_passkey(void)
     waiting_for_passkey_confirmation = false;
 }
 
-bool is_advertising()
+bool ble_is_advertising()
 {
     return is_adv;
+}
+
+bool ble_is_connected()
+{
+    return current_conn != NULL;
 }
 
 bool is_waiting_for_passkey_confirmation()
