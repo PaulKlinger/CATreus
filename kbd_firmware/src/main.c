@@ -120,7 +120,7 @@ int main(void)
 	printk("Init key matrix\n");
 	init_key_matrix();
 	init_ui();
-	bool last_wake_state = false;
+	struct pressed_keys last_pressed_keys = {0};
 
 	while (1) {
 		struct pressed_keys keys = read_key_matrix();
@@ -132,20 +132,23 @@ int main(void)
 			printk("\n");
 		}
 
-		struct encoded_keys encoded_keys = encode_keys(keys);
-		send_encoded_keys(encoded_keys);
+		printk("wake pressed: %d, n_pressed: %d\n", keys.wake_pressed, keys.n_pressed);
+		if (!eq_pressed_keys(last_pressed_keys, keys)){
+			printk("keys changed, new n: %d\n", keys.n_pressed);
+			struct encoded_keys encoded_keys = encode_keys(keys);
+			send_encoded_keys(encoded_keys);
 
-		
-		if (wake_pressed()) {
-			if (keys.n_pressed > 0) {
-				ui_send_wake_and_key(keys.keys[0]);
-			} else if (!last_wake_state) {
-				ui_send_wake();
+			if (keys.wake_pressed) {
+				if (keys.n_pressed > 0) {
+					ui_send_wake_and_key(keys.keys[0]);
+				} else if (!last_pressed_keys.wake_pressed) {
+					ui_send_wake();
+				}
+			} else if (ui_active() && keys.n_pressed > 0) {
+				ui_send_key(keys.keys[0]);
 			}
-		} else if (ui_active() && keys.n_pressed > 0) {
-			ui_send_key(keys.keys[0]);
 		}
-		last_wake_state = wake_pressed();
+		last_pressed_keys = keys;
 
 		if (keys.n_pressed > 0) {
 			// if keys are pressed always sleep for 50ms

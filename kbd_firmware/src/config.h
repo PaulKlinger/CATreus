@@ -2,6 +2,7 @@
 #define CONFIG_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define MAX_N_ENCODED_KEYS 6
 #define MAX_N_PRESSED_KEYS 6
@@ -15,6 +16,7 @@ struct key_coord
 
 struct pressed_keys
 {
+   bool wake_pressed;
    struct key_coord keys[MAX_N_PRESSED_KEYS];
    uint8_t n_pressed;
 };

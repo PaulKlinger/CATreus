@@ -1,7 +1,9 @@
-#include <stdint.h>
 #include "key_layout.h"
-#include "usb_hid_keys.h"
 
+#include <stdint.h>
+#include <zephyr/sys/printk.h>
+
+#include "usb_hid_keys.h"
 #include "key_matrix.h"
 
 enum key_layer {
@@ -169,7 +171,7 @@ struct key_with_mod key_map_layer_3[4][11] = {
         {KEY_APOSTROPHE, 0},
         {KEY_SEMICOLON, 0},
     },
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {{0}, {0}, {0}, {0}, {0}, {0}, {0}, {0}, {0}, {0}, {0}},
 };
 
 struct key_with_mod key_map_layer_5[4][11] = {
@@ -212,7 +214,7 @@ struct key_with_mod key_map_layer_5[4][11] = {
         {0, 0},
         {KEY_F12, 0},
     },
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {{0}, {0}, {0}, {0}, {0}, {0}, {0}, {0}, {0}, {0}, {0}},
 };
 
 

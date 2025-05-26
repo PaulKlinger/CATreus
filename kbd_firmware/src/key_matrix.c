@@ -99,6 +99,7 @@ void init_key_matrix(void) {
 
 struct pressed_keys read_key_matrix(void) {
     struct pressed_keys res = {0};
+    res.wake_pressed = wake_pressed();
     uint8_t row, col;
     
     for (col = 0; col < ARRAY_SIZE(gpio_cols); col++) {
@@ -130,4 +131,18 @@ int wait_for_key(int timeout_ms) {
     int ret = k_sem_take(&wake_sem, K_MSEC(timeout_ms));
     gpio_port_clear_bits(gpio_cols[0].port, drive_pins);
     return ret;
+}
+
+bool eq_pressed_keys(struct pressed_keys a, struct pressed_keys b) {
+    if (a.n_pressed != b.n_pressed || a.wake_pressed != b.wake_pressed) {
+        return false;
+    }
+    
+    for (int i = 0; i < a.n_pressed; i++) {
+        if (a.keys[i].row != b.keys[i].row || a.keys[i].col != b.keys[i].col) {
+            return false;
+        }
+    }
+    
+    return true;
 }
