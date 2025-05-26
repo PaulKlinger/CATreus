@@ -144,6 +144,7 @@ int main(void) {
                         // TODO: move this to UI, add applications page
                         send_encoded_keys((struct encoded_keys) {0});
                         suspend_ui();
+                        k_msleep(50);
 						run_mandelbrot();
                         resume_ui();
 					}
