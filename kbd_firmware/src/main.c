@@ -28,8 +28,8 @@
 #include "key_layout.h"
 #include "key_matrix.h"
 #include "leds.h"
-#include "ui.h"
 #include "mandelbrot.h"
+#include "ui.h"
 
 void i2c_scanner(const struct device *bus) {
     uint8_t error = 0u;
@@ -98,7 +98,6 @@ int main(void) {
 
     while (1) {
         uint32_t seconds_since_active = k_uptime_seconds() - last_active_time;
-		printk("Seconds since active: %d\n", seconds_since_active);
         if ((seconds_since_active > DEEP_SLEEP_TIMEOUT_S) ||
             ((seconds_since_active > DEEP_SLEEP_ADVERTISING_TIMEOUT_S) &&
              ble_is_advertising())) {
@@ -109,15 +108,8 @@ int main(void) {
 
         read_key_matrix();
 
-        printk("wake pressed: %d, n_pressed: %d\n", current_pressed_keys.wake_pressed,
-               current_pressed_keys.n_pressed);
         if (!eq_pressed_keys(last_pressed_keys, current_pressed_keys)) {
             last_active_time = k_uptime_seconds();
-            printk("keys changed, new n: %d\n", current_pressed_keys.n_pressed);
-
-           
-            struct encoded_keys encoded_keys = get_encoded_keys();
-            send_encoded_keys(encoded_keys);
 
             if (current_pressed_keys.wake_pressed) {
                 if (current_pressed_keys.n_pressed > 0) {
@@ -125,12 +117,25 @@ int main(void) {
                 } else if (!last_pressed_keys.wake_pressed) {
                     ui_send_wake();
                 }
-            } else if (ui_active() && current_pressed_keys.n_pressed > 0) {
+            } else {
+                // applications take exclusive control of the keys
+                // so only send them to the host if they are not running
+                if (application_running) {
+                    // send empty to clear any previous keys
+                    send_encoded_keys((struct encoded_keys){0});  // send empty keys
+                } else {
+                    struct encoded_keys encoded_keys = get_encoded_keys();
+                    send_encoded_keys(encoded_keys);
+                }
+            }
+            if (ui_active() && current_pressed_keys.n_pressed > 0) {
+                // TODO: doesn't really make sense, maybe just get rid of the key message?
                 ui_send_key(current_pressed_keys.keys[0]);
             }
         }
 
-        if (current_pressed_keys.n_pressed > 0 || current_pressed_keys.wake_pressed) {
+        if (current_pressed_keys.n_pressed > 0 ||
+            current_pressed_keys.wake_pressed) {
             // if keys are pressed always sleep for 50ms
             // (we can't use the level interrupt here)
             // TODO: could switch to edge interrupt in this case??
@@ -138,7 +143,6 @@ int main(void) {
             k_msleep(50);
         } else {
             ret = wait_for_key(2000);
-            printk("wake sem ret %d\n", ret);
         }
     }
 

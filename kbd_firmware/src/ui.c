@@ -20,11 +20,13 @@
 #include "display.h"
 #include "pmic.h"
 #include "key_layout.h"
+#include "mandelbrot.h"
 
 #define THREAD_STACK_SIZE 1024
 #define PRIORITY 5
 #define UI_TIME_STEP_MS 100
 #define UI_TIMEOUT_MS 10000
+
 
 // Whether an application (exclusive use of keyboard) is running
 bool application_running = false;
@@ -64,8 +66,6 @@ void send_ui_message(struct ui_message msg) {
     int ret = k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
     if (ret != 0) {
         printk("Error %d: failed to send UI message\n", ret);
-    } else {
-        printk("UI message sent: type %d\n", msg.type);
     }
 }
 
@@ -90,7 +90,6 @@ void ui_send_startup() {
 }
 
 void ui_send_wake() {
-    printk("sending wake message\n");
     struct ui_message msg;
     msg.type = UI_MESSAGE_TYPE_WAKE_PRESSED;
     send_ui_message(msg);
@@ -122,10 +121,11 @@ enum ui_page {
     UI_PAGE_WAKEUP = 6,
     UI_PAGE_SWAP_CTRL_CMD = 7,
     UI_PAGE_HELP = 8,
-    __UI_N_PAGES = 9,
+    UI_PAGE_APPS = 9,
+    __UI_N_PAGES = 10,
 };
 union ui_page_state {
-    uint32_t frame_idx;
+    uint32_t idx; // e.g. frame index, menu index, etc.
     unsigned int passkey;
 };
 
@@ -136,7 +136,6 @@ struct ui_state {
 };
 
 void open_page(struct ui_state *state, enum ui_page new_page) {
-    printk("switching page to %d", new_page);
     state->current_page = new_page;
     state->page_state = (union ui_page_state){0};
 }
@@ -229,8 +228,8 @@ void show_wakeup_page(struct ui_message msg, struct ui_state *state) {
 
 void show_swap_ctrl_cmd_page(struct ui_message msg, struct ui_state *state) {
     lcd_goto_xpix_y(0, 3);
-    if (state->page_state.frame_idx == 0) {
-        state->page_state.frame_idx = 1;
+    if (state->page_state.idx == 0) {
+        state->page_state.idx = 1;
         lcd_clear_buffer();
         lcd_goto_xpix_y(15, 3);
         swap_ctrl_cmd();
@@ -254,7 +253,26 @@ void show_help_page(struct ui_message msg, struct ui_state *state) {
     lcd_puts("S: shutdown\n");
     lcd_puts("D: debug info\n");
     lcd_puts("W: swap ctrl & cmd\n");
-    lcd_puts("A: apps menu (wip)\n");
+    lcd_puts("A: apps menu\n");
+    lcd_display();
+}
+
+void show_apps_page(struct ui_message msg, struct ui_state *state) {
+    if (msg.type == UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED) {
+        if (keq(msg.data.key, (struct key_coord){2, 7})) {
+            // Start mandelbrot app
+            run_mandelbrot();
+        } else if (keq(msg.data.key, (struct key_coord){0, 0})) {
+            open_page(state, UI_PAGE_WAKEUP);
+            return;
+        }
+    }
+    lcd_goto_xpix_y(0, 0);
+    lcd_clear_buffer();
+    lcd_puts("wake + <key> to start\n");
+    lcd_puts("M: mandelbrot\n");
+    lcd_goto_xpix_y(0, 6);
+    lcd_puts("X: exit");
     lcd_display();
 }
 
@@ -296,6 +314,8 @@ void init_ui_page_cfg() {
                              true};
     ui_page_cfgs[UI_PAGE_HELP] = (struct ui_page_cfg){
         show_help_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {0, 7}, true};
+    ui_page_cfgs[UI_PAGE_APPS] = (struct ui_page_cfg){
+        show_apps_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {1, 2}, false};
 };
 
 void switch_page(struct ui_state *state, struct ui_message *msg) {
@@ -327,7 +347,6 @@ void ui_thread() {
 
     int ret;
     while (1) {
-        printk("ui loop\n");
         if (state->current_page != UI_DISABLED) {
             // if the display is active update every UI_TIMESTEMP_MS
             ret = k_msgq_get(&ui_messages, &msg, K_MSEC(UI_TIME_STEP_MS));
@@ -336,12 +355,10 @@ void ui_thread() {
             ret = k_msgq_get(&ui_messages, &msg, K_FOREVER);
         }
         if (ret == 0) {
-            printk("Got ui message, type: %d\n", msg.type);
             // got a message, make sure display is on
             if (state->current_page == UI_DISABLED) {
                 display_init();
             }
-            printk("setting uptime");
             state->last_msg_time = k_uptime_get();
 
             if (ui_page_cfgs[state->current_page].allow_navigation) {
@@ -375,8 +392,4 @@ void init_ui(void) {
     ui_thread_id = k_thread_create(&ui_thread_data, ui_thread_stack,
                     K_THREAD_STACK_SIZEOF(ui_thread_stack), ui_thread, NULL,
                     NULL, NULL, PRIORITY, 0, K_NO_WAIT);
-}
-
-bool in_application() {
-    return application_running;
 }

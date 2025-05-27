@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include "config.h"
 
-bool in_application();
+extern bool application_running;
 
 void ui_send_wake_and_key(struct key_coord key);
 
