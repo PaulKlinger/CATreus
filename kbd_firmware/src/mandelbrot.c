@@ -141,39 +141,38 @@ void run_mandelbrot() {
         .center = {0, 0}, .scale = init_scale, .filled_blocks = 0};
 
     display_complete_mandelbrot(&screen);
-    while (read_key_matrix().wake_pressed){}
+    while (current_pressed_keys.wake_pressed){k_msleep(10);}
     k_msleep(50);  // Wait for display to turn on
 
     while (1) {
         while (1) {
-            struct pressed_keys keys = read_key_matrix();
-            if (keys.keys[0].row == 1 && keys.keys[0].col == 2) {
+            if (current_pressed_keys.keys[0].row == 1 && current_pressed_keys.keys[0].col == 2) {
                 screen.scale *= 2;
                 display_complete_mandelbrot(&screen);
-                while (read_key_matrix().n_pressed > 0) {
-                }
+                while (current_pressed_keys.n_pressed > 0) {k_msleep(10);}
                 k_msleep(100);
                 break;
-            } else if (keys.keys[0].row == 0 && keys.keys[0].col == 1) {
+            } else if (current_pressed_keys.keys[0].row == 0 && current_pressed_keys.keys[0].col == 1) {
                 screen.scale /= 2;
                 display_complete_mandelbrot(&screen);
-                while (read_key_matrix().n_pressed > 0) {
+                while (current_pressed_keys.n_pressed > 0) {
+                    k_msleep(10);
                 }
                 k_msleep(100);
                 break;
-            } else if (keys.keys[0].row == 1 && keys.keys[0].col == 1) {
+            } else if (current_pressed_keys.keys[0].row == 1 && current_pressed_keys.keys[0].col == 1) {
                 move_left(&screen);
                 break;
-            } else if (keys.keys[0].row == 1 && keys.keys[0].col == 3) {
+            } else if (current_pressed_keys.keys[0].row == 1 && current_pressed_keys.keys[0].col == 3) {
                 move_right(&screen);
                 break;
-            } else if (keys.keys[0].row == 0 && keys.keys[0].col == 2) {
+            } else if (current_pressed_keys.keys[0].row == 0 && current_pressed_keys.keys[0].col == 2) {
                 move_up(&screen);
                 break;
-            } else if (keys.keys[0].row == 2 && keys.keys[0].col == 2) {
+            } else if (current_pressed_keys.keys[0].row == 2 && current_pressed_keys.keys[0].col == 2) {
                 move_down(&screen);
                 break;
-            } else if (keys.wake_pressed) {
+            } else if (current_pressed_keys.wake_pressed) {
                 return;
             }
             k_msleep(10);

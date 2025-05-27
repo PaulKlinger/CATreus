@@ -9,6 +9,9 @@
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
 
 
+struct pressed_keys current_pressed_keys = {0};
+struct pressed_keys last_pressed_keys = {0};
+
 const struct gpio_dt_spec gpio_rows[] = {
     GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, r0_gpios),
     GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, r1_gpios),
@@ -97,7 +100,7 @@ void init_key_matrix(void) {
 
 }
 
-struct pressed_keys read_key_matrix(void) {
+void read_key_matrix(void) {
     struct pressed_keys res = {0};
     res.wake_pressed = wake_pressed();
     uint8_t row, col;
@@ -109,15 +112,16 @@ struct pressed_keys read_key_matrix(void) {
                 res.keys[res.n_pressed].row = row;
                 res.keys[res.n_pressed].col = col;
                 res.n_pressed++;
-                if (res.n_pressed >= MAX_PRESSED_KEYS) {
+                if (res.n_pressed >= MAX_N_PRESSED_KEYS) {
                     break;
                 }
             }
         }
         gpio_pin_set_dt(&gpio_cols[col], 0);
     }
-    
-    return res;
+
+    last_pressed_keys = current_pressed_keys;
+    current_pressed_keys = res;
 }
 
 bool wake_pressed(void) {

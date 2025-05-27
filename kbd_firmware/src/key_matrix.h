@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include "config.h"
 
-struct pressed_keys read_key_matrix(void);
+void read_key_matrix(void);
 
 void init_key_matrix(void);
 
@@ -13,6 +13,7 @@ bool wake_pressed(void);
 
 int wait_for_key(int timeout_ms);
 
-#define MAX_PRESSED_KEYS 6
+extern struct pressed_keys current_pressed_keys;
+extern struct pressed_keys last_pressed_keys;
 
 #endif // KEY_MATRIX_H

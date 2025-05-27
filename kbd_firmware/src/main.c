@@ -94,7 +94,6 @@ int main(void) {
     printk("Init key matrix\n");
     init_key_matrix();
     init_ui();
-    struct pressed_keys last_pressed_keys = {0};
     uint32_t last_active_time = k_uptime_seconds();
 
     enum key_layer current_layer = LAYER_0;
@@ -110,37 +109,37 @@ int main(void) {
             ui_send_wake_and_key((struct key_coord){1, 6});  // S
         }
 
-        struct pressed_keys keys = read_key_matrix();
-        if (keys.n_pressed > 0) {
+        read_key_matrix();
+        if (current_pressed_keys.n_pressed > 0) {
             printk("pressed keys: ");
-            for (int i = 0; i < keys.n_pressed; i++) {
-                printk("%d,%d ", keys.keys[i].row, keys.keys[i].col);
+            for (int i = 0; i < current_pressed_keys.n_pressed; i++) {
+                printk("%d,%d ", current_pressed_keys.keys[i].row, current_pressed_keys.keys[i].col);
             }
             printk("\n");
         }
 
-        if (keys.n_pressed == 0) {
+        if (current_pressed_keys.n_pressed == 0) {
             current_layer = LAYER_0;  // Reset to default layer
         }
 
-        printk("wake pressed: %d, n_pressed: %d\n", keys.wake_pressed,
-               keys.n_pressed);
-        if (!eq_pressed_keys(last_pressed_keys, keys)) {
+        printk("wake pressed: %d, n_pressed: %d\n", current_pressed_keys.wake_pressed,
+               current_pressed_keys.n_pressed);
+        if (!eq_pressed_keys(last_pressed_keys, current_pressed_keys)) {
             last_active_time = k_uptime_seconds();
-            printk("keys changed, new n: %d\n", keys.n_pressed);
+            printk("keys changed, new n: %d\n", current_pressed_keys.n_pressed);
 
             if (current_layer == LAYER_0) {
                 // only change layer if no keys are pressed or we are on layer 0
                 // to prevent e.g. "()" turning into "()r"
                 // test () ()()()()()4##33() 
-                current_layer = get_active_layer(keys);
+                current_layer = get_active_layer(current_pressed_keys);
             }
-            struct encoded_keys encoded_keys = encode_keys(keys, current_layer);
+            struct encoded_keys encoded_keys = encode_keys(current_pressed_keys, current_layer);
             send_encoded_keys(encoded_keys);
 
-            if (keys.wake_pressed) {
-                if (keys.n_pressed > 0) {
-					if (keys.keys[0].row == 2 && keys.keys[0].col == 7) {
+            if (current_pressed_keys.wake_pressed) {
+                if (current_pressed_keys.n_pressed > 0) {
+					if (current_pressed_keys.keys[0].row == 2 && current_pressed_keys.keys[0].col == 7) {
                         // TODO: move this to UI, add applications page
                         send_encoded_keys((struct encoded_keys) {0});
                         suspend_ui();
@@ -148,17 +147,16 @@ int main(void) {
 						run_mandelbrot();
                         resume_ui();
 					}
-                    ui_send_wake_and_key(keys.keys[0]);
+                    ui_send_wake_and_key(current_pressed_keys.keys[0]);
                 } else if (!last_pressed_keys.wake_pressed) {
                     ui_send_wake();
                 }
-            } else if (ui_active() && keys.n_pressed > 0) {
-                ui_send_key(keys.keys[0]);
+            } else if (ui_active() && current_pressed_keys.n_pressed > 0) {
+                ui_send_key(current_pressed_keys.keys[0]);
             }
         }
-        last_pressed_keys = keys;
 
-        if (keys.n_pressed > 0 || keys.wake_pressed) {
+        if (current_pressed_keys.n_pressed > 0 || current_pressed_keys.wake_pressed) {
             // if keys are pressed always sleep for 50ms
             // (we can't use the level interrupt here)
             // TODO: could switch to edge interrupt in this case??

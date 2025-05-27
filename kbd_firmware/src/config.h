@@ -10,7 +10,6 @@
 #define DEEP_SLEEP_ADVERTISING_TIMEOUT_S 60 * 5
 
 
-
 struct key_coord
 {
    uint8_t row;

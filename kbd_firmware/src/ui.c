@@ -19,11 +19,15 @@
 #include "config.h"
 #include "display.h"
 #include "pmic.h"
+#include "key_layout.h"
 
 #define THREAD_STACK_SIZE 1024
 #define PRIORITY 5
 #define UI_TIME_STEP_MS 100
 #define UI_TIMEOUT_MS 10000
+
+// Whether an application (exclusive use of keyboard) is running
+bool application_running = false;
 
 // ----------------------------------------------------
 // Thread & queue defs
@@ -116,7 +120,9 @@ enum ui_page {
     UI_PAGE_CONFIRM_PASSKEY = 4,
     UI_PAGE_DISPLAY_PASSKEY = 5,
     UI_PAGE_WAKEUP = 6,
-    __UI_N_PAGES = 7,
+    UI_PAGE_SWAP_CTRL_CMD = 7,
+    UI_PAGE_HELP = 8,
+    __UI_N_PAGES = 9,
 };
 union ui_page_state {
     uint32_t frame_idx;
@@ -215,9 +221,40 @@ void show_shutdown_page(struct ui_message msg, struct ui_state *state) {
 }
 
 void show_wakeup_page(struct ui_message msg, struct ui_state *state) {
-    lcd_goto_xpix_y(50, 3);
+    lcd_goto_xpix_y(48, 3);
     lcd_clear_buffer();
     lcd_puts("^ _ ^");
+    lcd_display();
+}
+
+void show_swap_ctrl_cmd_page(struct ui_message msg, struct ui_state *state) {
+    lcd_goto_xpix_y(0, 3);
+    if (state->page_state.frame_idx == 0) {
+        state->page_state.frame_idx = 1;
+        lcd_clear_buffer();
+        lcd_goto_xpix_y(15, 3);
+        swap_ctrl_cmd();
+        // TODO: save this per connection to flash
+        if (ctrl_cmd_swapped) {
+            lcd_puts("[ctrl]     [cmd]");
+        } else {
+            lcd_puts("[cmd]     [ctrl]");
+        }
+    }
+    lcd_display();
+    k_msleep(250);
+    open_page(state, UI_PAGE_WAKEUP);
+}
+
+void show_help_page(struct ui_message msg, struct ui_state *state) {
+    lcd_goto_xpix_y(0, 0);
+    lcd_clear_buffer();
+    lcd_puts("wake + <key>\n");
+    lcd_puts("H: this page\n");
+    lcd_puts("S: shutdown\n");
+    lcd_puts("D: debug info\n");
+    lcd_puts("W: swap ctrl & cmd\n");
+    lcd_puts("A: apps menu (wip)\n");
     lcd_display();
 }
 
@@ -253,6 +290,12 @@ void init_ui_page_cfg() {
                              UI_MESSAGE_TYPE_DISPLAY_PASSKEY, NO_KEY, true};
     ui_page_cfgs[UI_PAGE_WAKEUP] = (struct ui_page_cfg){
         show_wakeup_page, UI_MESSAGE_TYPE_WAKE_PRESSED, NO_KEY, true};
+    ui_page_cfgs[UI_PAGE_SWAP_CTRL_CMD] =
+        (struct ui_page_cfg){show_swap_ctrl_cmd_page,
+                             UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {0, 4},
+                             true};
+    ui_page_cfgs[UI_PAGE_HELP] = (struct ui_page_cfg){
+        show_help_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {0, 7}, true};
 };
 
 void switch_page(struct ui_state *state, struct ui_message *msg) {
@@ -333,4 +376,8 @@ void init_ui(void) {
     ui_thread_id = k_thread_create(&ui_thread_data, ui_thread_stack,
                     K_THREAD_STACK_SIZEOF(ui_thread_stack), ui_thread, NULL,
                     NULL, NULL, PRIORITY, 0, K_NO_WAIT);
-};
+}
+
+bool in_application() {
+    return application_running;
+}

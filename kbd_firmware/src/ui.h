@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include "config.h"
 
+bool in_application();
+
 void ui_send_wake_and_key(struct key_coord key);
 
 void ui_send_key(struct key_coord key);

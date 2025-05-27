@@ -272,3 +272,21 @@ struct encoded_keys encode_keys(struct pressed_keys keys, enum key_layer layer) 
     }
     return encoded;
 }
+
+bool ctrl_cmd_swapped = false;
+
+void swap_ctrl_cmd() {
+    ctrl_cmd_swapped = !ctrl_cmd_swapped;
+    // Swap Ctrl and Cmd keys in the key map
+    for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 11; col++) {
+            if (key_map_layer_0[row][col].key == KEY_LEFTCTRL) {
+                key_map_layer_0[row][col].key = KEY_LEFTMETA;
+                key_map_layer_0[row][col].mod = KEY_MOD_LMETA;
+            } else if (key_map_layer_0[row][col].key == KEY_LEFTMETA) {
+                key_map_layer_0[row][col].key = KEY_LEFTCTRL;
+                key_map_layer_0[row][col].mod = KEY_MOD_LCTRL;
+            }
+        }
+    }
+}
