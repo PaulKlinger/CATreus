@@ -16,6 +16,10 @@ struct key_coord
    uint8_t col;
 };
 
+inline bool keq(struct key_coord a, struct key_coord b) {
+    return a.row == b.row && a.col == b.col;
+}
+
 struct pressed_keys
 {
    bool wake_pressed;

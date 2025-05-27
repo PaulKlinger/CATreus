@@ -143,7 +143,7 @@ bool eq_pressed_keys(struct pressed_keys a, struct pressed_keys b) {
     }
     
     for (int i = 0; i < a.n_pressed; i++) {
-        if (a.keys[i].row != b.keys[i].row || a.keys[i].col != b.keys[i].col) {
+        if (!keq(a.keys[i], b.keys[i])) {
             return false;
         }
     }

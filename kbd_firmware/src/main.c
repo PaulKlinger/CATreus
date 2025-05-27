@@ -105,7 +105,7 @@ int main(void) {
             ((seconds_since_active > DEEP_SLEEP_ADVERTISING_TIMEOUT_S) &&
              ble_is_advertising())) {
             printk("No keys pressed for %ds, going to deep sleep\n",
-                   DEEP_SLEEP_TIMEOUT_S);
+                   seconds_since_active);
             ui_send_wake_and_key((struct key_coord){1, 6});  // S
         }
 
@@ -139,14 +139,6 @@ int main(void) {
 
             if (current_pressed_keys.wake_pressed) {
                 if (current_pressed_keys.n_pressed > 0) {
-					if (current_pressed_keys.keys[0].row == 2 && current_pressed_keys.keys[0].col == 7) {
-                        // TODO: move this to UI, add applications page
-                        send_encoded_keys((struct encoded_keys) {0});
-                        suspend_ui();
-                        k_msleep(50);
-						run_mandelbrot();
-                        resume_ui();
-					}
                     ui_send_wake_and_key(current_pressed_keys.keys[0]);
                 } else if (!last_pressed_keys.wake_pressed) {
                     ui_send_wake();

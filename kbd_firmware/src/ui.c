@@ -267,9 +267,9 @@ struct ui_page_cfg {
 };
 struct ui_page_cfg ui_page_cfgs[__UI_N_PAGES];
 
-#define NO_KEY \
-    {42, 42}   \
-    // No key defined, used for pages that don't require a key press to show
+// Used for pages that don't require a key press to show
+#define NO_KEY {42, 42} 
+    
 void init_ui_page_cfg() {
     ui_page_cfgs[UI_DISABLED] =
         (struct ui_page_cfg){NULL, UI_MESSAGE_TYPE_NOMSG, NO_KEY, true};
@@ -302,9 +302,8 @@ void switch_page(struct ui_state *state, struct ui_message *msg) {
     for (int i = 0; i < __UI_N_PAGES; i++) {
         struct ui_page_cfg cfg = ui_page_cfgs[i];
         if (cfg.trigger_msg == msg->type &&
-            ((cfg.trigger_key.row == 42 && cfg.trigger_key.col == 42) ||
-             (cfg.trigger_key.row == msg->data.key.row &&
-              cfg.trigger_key.col == msg->data.key.col))) {
+            (keq(cfg.trigger_key, (struct key_coord){42, 42}) ||
+             keq(cfg.trigger_key, msg->data.key))) {
             if (state->current_page != i) {
                 open_page(state, (enum ui_page)i);
             }
