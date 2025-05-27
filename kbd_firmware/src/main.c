@@ -96,8 +96,6 @@ int main(void) {
     init_ui();
     uint32_t last_active_time = k_uptime_seconds();
 
-    enum key_layer current_layer = LAYER_0;
-
     while (1) {
         uint32_t seconds_since_active = k_uptime_seconds() - last_active_time;
 		printk("Seconds since active: %d\n", seconds_since_active);
@@ -110,17 +108,6 @@ int main(void) {
         }
 
         read_key_matrix();
-        if (current_pressed_keys.n_pressed > 0) {
-            printk("pressed keys: ");
-            for (int i = 0; i < current_pressed_keys.n_pressed; i++) {
-                printk("%d,%d ", current_pressed_keys.keys[i].row, current_pressed_keys.keys[i].col);
-            }
-            printk("\n");
-        }
-
-        if (current_pressed_keys.n_pressed == 0) {
-            current_layer = LAYER_0;  // Reset to default layer
-        }
 
         printk("wake pressed: %d, n_pressed: %d\n", current_pressed_keys.wake_pressed,
                current_pressed_keys.n_pressed);
@@ -128,13 +115,8 @@ int main(void) {
             last_active_time = k_uptime_seconds();
             printk("keys changed, new n: %d\n", current_pressed_keys.n_pressed);
 
-            if (current_layer == LAYER_0) {
-                // only change layer if no keys are pressed or we are on layer 0
-                // to prevent e.g. "()" turning into "()r"
-                // test () ()()()()()4##33() 
-                current_layer = get_active_layer(current_pressed_keys);
-            }
-            struct encoded_keys encoded_keys = encode_keys(current_pressed_keys, current_layer);
+           
+            struct encoded_keys encoded_keys = get_encoded_keys();
             send_encoded_keys(encoded_keys);
 
             if (current_pressed_keys.wake_pressed) {

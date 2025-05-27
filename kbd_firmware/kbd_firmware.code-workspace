@@ -34,7 +34,8 @@
 			"string_view": "c",
 			"xlocale": "c",
 			"mandelbrot.h": "c",
-			"bluetooth.h": "c"
+			"bluetooth.h": "c",
+			"config.h": "c"
 		}
 	}
 }
