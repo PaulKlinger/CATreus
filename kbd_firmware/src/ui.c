@@ -241,7 +241,7 @@ void show_swap_ctrl_cmd_page(struct ui_message msg, struct ui_state *state) {
         }
     }
     lcd_display();
-    k_msleep(250);
+    k_msleep(350);
     open_page(state, UI_PAGE_WAKEUP);
 }
 
@@ -261,7 +261,9 @@ void show_apps_page(struct ui_message msg, struct ui_state *state) {
     if (msg.type == UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED) {
         if (keq(msg.data.key, (struct key_coord){2, 7})) {
             // Start mandelbrot app
+            application_running = true;
             run_mandelbrot();
+            application_running = false;
         } else if (keq(msg.data.key, (struct key_coord){0, 0})) {
             open_page(state, UI_PAGE_WAKEUP);
             return;
