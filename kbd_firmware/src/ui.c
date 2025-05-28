@@ -56,7 +56,8 @@ struct ui_message {
     } data;
 };
 
-char ui_message_buffer[10 * sizeof(struct ui_message)];
+#define UI_MSG_QUEUE_SIZE 2
+char ui_message_buffer[UI_MSG_QUEUE_SIZE * sizeof(struct ui_message)];
 struct k_msgq ui_messages;
 
 // ----------------------------------------------------
@@ -388,7 +389,7 @@ void resume_ui() {
 }
 
 void init_ui(void) {
-    k_msgq_init(&ui_messages, ui_message_buffer, sizeof(struct ui_message), 10);
+    k_msgq_init(&ui_messages, ui_message_buffer, sizeof(struct ui_message), UI_MSG_QUEUE_SIZE);
     disable_display();
     init_ui_page_cfg();
     ui_thread_id = k_thread_create(&ui_thread_data, ui_thread_stack,

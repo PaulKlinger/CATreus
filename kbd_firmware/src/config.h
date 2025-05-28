@@ -6,8 +6,13 @@
 
 #define MAX_N_ENCODED_KEYS 6
 #define MAX_N_PRESSED_KEYS 6
+// go to sleep if no key presses for this time
 #define DEEP_SLEEP_TIMEOUT_S 60 * 30
+// go to sleep if no key presses and keyboard is advertising
 #define DEEP_SLEEP_ADVERTISING_TIMEOUT_S 60 * 5
+// go to sleep if constant key presses for this time
+// (to prevent battery drain if something is lying on the keyboard)
+#define DEEP_SLEEP_NO_PRESSED_TIMEOUT_S 60 * 5
 
 struct key_coord {
     uint8_t row;

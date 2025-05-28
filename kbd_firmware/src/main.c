@@ -95,13 +95,16 @@ int main(void) {
     init_key_matrix();
     init_ui();
     uint32_t last_active_time = k_uptime_seconds();
+    uint32_t last_no_pressed_time = last_active_time;
 
     while (1) {
         uint32_t seconds_since_active = k_uptime_seconds() - last_active_time;
+        uint32_t seconds_since_no_pressed = k_uptime_seconds() - last_no_pressed_time;
         if ((seconds_since_active > DEEP_SLEEP_TIMEOUT_S) ||
             ((seconds_since_active > DEEP_SLEEP_ADVERTISING_TIMEOUT_S) &&
-             ble_is_advertising())) {
-            printk("No keys pressed for %ds, going to deep sleep\n",
+             ble_is_advertising()) ||
+            (seconds_since_no_pressed > DEEP_SLEEP_NO_PRESSED_TIMEOUT_S)) {
+            printk("No activity for %ds, going to deep sleep\n",
                    seconds_since_active);
             ui_send_wake_and_key((struct key_coord){1, 6});  // S
         }
@@ -132,6 +135,11 @@ int main(void) {
                 // TODO: doesn't really make sense, maybe just get rid of the key message?
                 ui_send_key(current_pressed_keys.keys[0]);
             }
+        }
+
+        if (current_pressed_keys.n_pressed == 0 &&
+            !current_pressed_keys.wake_pressed) {
+            last_no_pressed_time = k_uptime_seconds();
         }
 
         if (current_pressed_keys.n_pressed > 0 ||
