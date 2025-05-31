@@ -30,6 +30,7 @@
 #include "leds.h"
 #include "mandelbrot.h"
 #include "ui.h"
+#include "nvs.h"
 
 void i2c_scanner(const struct device *bus) {
     uint8_t error = 0u;
@@ -80,8 +81,11 @@ int main(void) {
     init_ui();
     ui_send_startup();
 
-    int err;
+    nvs_init();
+    uint16_t n_boot = nvs_read_n_boot();
+    nvs_store_n_boot(n_boot + 1);
 
+    int err;
     err = init_bluetooth();
     if (err) {
         printk("Bluetooth init failed (err %d)\n", err);

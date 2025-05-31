@@ -2,6 +2,7 @@
 #include "config.h"
 #include "ui.h"
 #include "leds.h"
+#include "key_layout.h"
 
 #include <zephyr/types.h>
 #include <stddef.h>
@@ -123,6 +124,14 @@ static struct bt_conn *current_conn = NULL;
 
 static struct k_work adv_work;
 
+struct addr get_current_addr() {
+    struct addr addr;
+    if (current_conn) {
+        bt_addr_le_to_str(bt_conn_get_dst(current_conn), addr.addr, sizeof(addr.addr));
+    }
+    return addr;
+}
+
 
 static void advertising_start(void)
 {
@@ -191,6 +200,8 @@ static void connected(struct bt_conn *conn, uint8_t err)
             printk("Failed to set security to L3: %d\n", ret);
         }
 	}
+
+    init_key_layout();
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)

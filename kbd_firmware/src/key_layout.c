@@ -7,6 +7,8 @@
 #include "key_matrix.h"
 #include "usb_hid_keys.h"
 
+#include "nvs.h"
+
 enum key_layer {
     LAYER_0 = 0,
     LAYER_2 = 2,
@@ -365,8 +367,7 @@ struct encoded_keys get_encoded_keys() {
 
 bool ctrl_cmd_swapped = false;
 
-void swap_ctrl_cmd() {
-    ctrl_cmd_swapped = !ctrl_cmd_swapped;
+void swap_ctrl_cmd_in_keymap() {
     // Swap Ctrl and Cmd keys in the key map
     for (int row = 0; row < 4; row++) {
         for (int col = 0; col < 11; col++) {
@@ -378,5 +379,18 @@ void swap_ctrl_cmd() {
                 key_map_layer_0[row][col].mod = KEY_MOD_LCTRL;
             }
         }
+    }
+}
+
+void swap_ctrl_cmd() {
+    ctrl_cmd_swapped = !ctrl_cmd_swapped;
+    swap_ctrl_cmd_in_keymap();
+    nvs_store_ctrl_cmd(ctrl_cmd_swapped);
+}
+
+void init_key_layout() {
+    if (nvs_get_ctrl_cmd_config() != ctrl_cmd_swapped) {
+        ctrl_cmd_swapped = !ctrl_cmd_swapped;
+        swap_ctrl_cmd_in_keymap();
     }
 }

@@ -4,6 +4,7 @@
 
 #include <stdbool.h>
 #include "config.h"
+#include <zephyr/bluetooth/bluetooth.h>
 
 bool ble_is_advertising();
 bool ble_is_connected();
@@ -15,5 +16,10 @@ void reject_passkey();
 int init_bluetooth();
 void send_encoded_keys(struct encoded_keys keys);
 
+struct addr {
+    char addr[BT_ADDR_LE_STR_LEN];
+};
+
+struct addr get_current_addr();
 
 #endif // BLUETOOTH_H
