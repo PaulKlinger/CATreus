@@ -35,7 +35,8 @@
 			"xlocale": "c",
 			"mandelbrot.h": "c",
 			"bluetooth.h": "c",
-			"config.h": "c"
+			"config.h": "c",
+			"anim_wake.h": "c"
 		}
 	}
 }
