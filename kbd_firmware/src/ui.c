@@ -15,22 +15,22 @@
 #include <zephyr/sys/printk.h>
 #include <zephyr/types.h>
 
+#include "anim.h"
+#include "anim_idle.h"
+#include "anim_sleep.h"
+#include "anim_wake.h"
 #include "bluetooth.h"
 #include "config.h"
 #include "display.h"
-#include "pmic.h"
 #include "key_layout.h"
+#include "key_matrix.h"
 #include "mandelbrot.h"
-#include "anim.h"
-#include "anim_wake.h"
-#include "anim_sleep.h"
-#include "anim_idle.h"
+#include "pmic.h"
 
 #define THREAD_STACK_SIZE 1024
 #define PRIORITY 5
-#define UI_TIME_STEP_MS 75
+#define UI_TIME_STEP_MS 50
 #define UI_TIMEOUT_MS 10000
-
 
 // Whether an application (exclusive use of keyboard) is running
 bool application_running = false;
@@ -60,7 +60,7 @@ struct ui_message {
     } data;
 };
 
-#define UI_MSG_QUEUE_SIZE 2
+#define UI_MSG_QUEUE_SIZE 1
 char ui_message_buffer[UI_MSG_QUEUE_SIZE * sizeof(struct ui_message)];
 struct k_msgq ui_messages;
 
@@ -68,7 +68,7 @@ struct k_msgq ui_messages;
 // functions to send to queue
 
 void send_ui_message(struct ui_message msg) {
-    int ret = k_msgq_put(&ui_messages, &msg, K_NO_WAIT);
+    int ret = k_msgq_put(&ui_messages, &msg, K_MSEC(UI_TIME_STEP_MS));
     if (ret != 0) {
         printk("Error %d: failed to send UI message\n", ret);
     }
@@ -134,7 +134,7 @@ struct anim_state {
     int64_t frame_start_time;
 };
 union ui_page_state {
-    uint32_t idx; // e.g. menu index, etc.
+    uint32_t idx;  // e.g. menu index, etc.
     struct anim_state anim;
     unsigned int passkey;
 };
@@ -155,9 +155,11 @@ bool show_animation(struct anim_state *state, struct animation *anim) {
         state->frame_start_time = k_uptime_get();
         state->frame_idx = anim->init_idx;
     }
-    memcpy(displayBuffer, anim->frames[state->frame_idx], sizeof(displayBuffer));
+    memcpy(displayBuffer, anim->frames[state->frame_idx],
+           sizeof(displayBuffer));
     lcd_display();
-    if (k_uptime_get() - state->frame_start_time > 100 * (int) anim->frame_counts[state->frame_idx]) {
+    if (k_uptime_get() - state->frame_start_time >
+        100 * (int)anim->frame_counts[state->frame_idx]) {
         if (state->frame_idx == anim->end_idx) {
             if (anim->loop) {
                 state->frame_idx = anim->start_idx;
@@ -182,13 +184,13 @@ void show_debug_page(struct ui_message msg, struct ui_state *state) {
     struct pmic_state pmic_state = get_pmic_state();
     int64_t uptime = k_uptime_get();
 
-    char str[80];
+    char str[120];
     sprintf(str,
-            "usb %d s %d e %d \n %1.0fmA %1.3fV\nconn: %d\nuptime: %4lldm %2llds ",
+            "usb %d s %d e %d \n %1.0fmA %1.3fV\nconn: %d\nuptime: %4lldm %2llds\nks: %d wake: %d",
             pmic_state.vbus_present, pmic_state.charger_status,
             pmic_state.charger_error, (double)pmic_state.battery_current,
             (double)pmic_state.battery_voltage, ble_is_connected(),
-            uptime / 60000, uptime % 60000 / 1000);
+            uptime / 60000, uptime % 60000 / 1000, current_pressed_keys.n_pressed, current_pressed_keys.wake_pressed);
 
     lcd_goto_xpix_y(0, 0);
     lcd_clear_buffer();
@@ -314,39 +316,25 @@ struct ui_page_cfg {
     struct key_coord trigger_key;  // press wake + trigger_key to show this page
     bool allow_navigation;  // if true, respond to triggers of other pages
 };
-struct ui_page_cfg ui_page_cfgs[__UI_N_PAGES];
 
 // Used for pages that don't require a key press to show
-#define NO_KEY {42, 42} 
-    
-void init_ui_page_cfg() {
-    ui_page_cfgs[UI_DISABLED] =
-        (struct ui_page_cfg){NULL, UI_MESSAGE_TYPE_NOMSG, NO_KEY, true};
-    ui_page_cfgs[UI_PAGE_SHUTDOWN] =
-        (struct ui_page_cfg){show_shutdown_page,
-                             UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED,
-                             {1, 6},
-                             false};
-    ui_page_cfgs[UI_PAGE_DEBUG] = (struct ui_page_cfg){
-        show_debug_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {1, 10}, true};
-    ui_page_cfgs[UI_PAGE_CONFIRM_PASSKEY] =
-        (struct ui_page_cfg){show_confirm_passkey_page,
-                             UI_MESSAGE_TYPE_CONFIRM_PASSKEY, NO_KEY, false};
-    ui_page_cfgs[UI_PAGE_DISPLAY_PASSKEY] =
-        (struct ui_page_cfg){show_display_passkey_page,
-                             UI_MESSAGE_TYPE_DISPLAY_PASSKEY, NO_KEY, true};
-    ui_page_cfgs[UI_PAGE_STARTUP] = (struct ui_page_cfg){
-        show_startup_page, UI_MESSAGE_TYPE_STARTUP, NO_KEY, true};
-    ui_page_cfgs[UI_PAGE_SWAP_CTRL_CMD] =
-        (struct ui_page_cfg){show_swap_ctrl_cmd_page,
-                             UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {0, 4},
-                             true};
-    ui_page_cfgs[UI_PAGE_HELP] = (struct ui_page_cfg){
-        show_help_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {0, 7}, true};
-    ui_page_cfgs[UI_PAGE_APPS] = (struct ui_page_cfg){
-        show_apps_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {1, 2}, false};
-    ui_page_cfgs[UI_PAGE_IDLE] = (struct ui_page_cfg){
-        show_idle_page, UI_MESSAGE_TYPE_WAKE_PRESSED, NO_KEY, true};
+#define NO_KEY {42, 42}
+
+struct ui_page_cfg ui_page_cfgs[__UI_N_PAGES] = {
+    {NULL, UI_MESSAGE_TYPE_NOMSG, NO_KEY, true},
+    {show_shutdown_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {1, 6}, false},
+    {show_debug_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {1, 10}, true},
+    {show_confirm_passkey_page, UI_MESSAGE_TYPE_CONFIRM_PASSKEY, NO_KEY, false},
+
+    {show_display_passkey_page, UI_MESSAGE_TYPE_DISPLAY_PASSKEY, NO_KEY, true},
+    {show_startup_page, UI_MESSAGE_TYPE_STARTUP, NO_KEY, false},
+    {show_swap_ctrl_cmd_page,
+     UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED,
+     {0, 4},
+     true},
+    {show_help_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {0, 7}, true},
+    {show_apps_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {1, 2}, false},
+    {show_idle_page, UI_MESSAGE_TYPE_WAKE_PRESSED, NO_KEY, true},
 };
 
 void switch_page(struct ui_state *state, struct ui_message *msg) {
@@ -414,19 +402,16 @@ void ui_thread() {
     }
 }
 
-void suspend_ui() {
-    k_thread_suspend(ui_thread_id);
-}
+void suspend_ui() { k_thread_suspend(ui_thread_id); }
 
-void resume_ui() {
-    k_thread_resume(ui_thread_id);
-}
+void resume_ui() { k_thread_resume(ui_thread_id); }
 
 void init_ui(void) {
-    k_msgq_init(&ui_messages, ui_message_buffer, sizeof(struct ui_message), UI_MSG_QUEUE_SIZE);
+    k_msgq_init(&ui_messages, ui_message_buffer, sizeof(struct ui_message),
+                UI_MSG_QUEUE_SIZE);
     disable_display();
-    init_ui_page_cfg();
-    ui_thread_id = k_thread_create(&ui_thread_data, ui_thread_stack,
-                    K_THREAD_STACK_SIZEOF(ui_thread_stack), ui_thread, NULL,
-                    NULL, NULL, PRIORITY, 0, K_NO_WAIT);
+    ui_thread_id =
+        k_thread_create(&ui_thread_data, ui_thread_stack,
+                        K_THREAD_STACK_SIZEOF(ui_thread_stack), ui_thread, NULL,
+                        NULL, NULL, PRIORITY, 0, K_NO_WAIT);
 }

@@ -143,7 +143,6 @@ int main(void) {
             // if keys are pressed always sleep for 50ms
             // (we can't use the level interrupt here)
             // TODO: could switch to edge interrupt in this case??
-            //       or go to deep sleep if keys don't change for a long time
             k_msleep(50);
         } else {
             ret = wait_for_key(2000);
