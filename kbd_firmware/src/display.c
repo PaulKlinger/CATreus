@@ -125,7 +125,7 @@ const uint8_t init_sequence[] = {
     0x10,  // --set high column address
     0x40,  // --set start line address
     0x81,
-    0x3F,  // Set contrast control register
+    0xFF,  // Set contrast control register
     0xA0,  // Set Segment Re-map. A0=address mapped; A1=address 127 mapped.
     0xA6,  // Set display mode. A6=Normal; A7=Inverse
     0xA8,
@@ -135,7 +135,7 @@ const uint8_t init_sequence[] = {
     0xD3,
     0x00,  // Set display offset. 00 = no offset
     0xD5,  // --set display clock divide ratio/oscillator frequency
-    0xF0,  // --set divide ratio
+    0b11110000,  // --set divide ratio
     0xD9,
     0x22,  // Set pre-charge period
     0xDA,
@@ -296,6 +296,7 @@ void display_init(void) {
     if (ret != 0) {
         printk("Error %d: failed to write to the display\n", ret);
     }
+    k_msleep(50);  // Wait for display to turn on
     lcd_display();
 }
 
