@@ -195,9 +195,9 @@ struct key_with_mod key_map_layer_3[4][11] = {
         {0, 0},
         {KEY_4, KEY_MOD_LSHIFT},          // $
         {KEY_BACKSLASH, KEY_MOD_LSHIFT},  // |
-        {KEY_GRAVE, KEY_MOD_LSHIFT},      //
+        {KEY_GRAVE, KEY_MOD_LSHIFT},      // ~
         {KEY_GRAVE, 0},
-        {KEY_EQUAL, KEY_MOD_LSHIFT},       // +
+        {KEY_KPPLUS, 0},       // +
         {KEY_5, KEY_MOD_LSHIFT},           // %
         {KEY_APOSTROPHE, KEY_MOD_LSHIFT},  // "
         {KEY_APOSTROPHE, 0},
