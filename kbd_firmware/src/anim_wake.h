@@ -1,10 +1,9 @@
 
-#ifndef ANIM_WAKE_H
-#define ANIM_WAKE_H
-#include <stdint.h>
+#ifndef WAKE_H
+#define WAKE_H
+#include "anim.h"
 
-#define ANIM_WAKE_N_FRAMES 27
-extern const uint8_t anim_wake_frames[ANIM_WAKE_N_FRAMES][8][128];
-extern const uint8_t anim_wake_frame_counts[ANIM_WAKE_N_FRAMES];
+#define WAKE_N_FRAMES 26
+extern struct animation anim_wake;
 
-#endif // ANIM_WAKE_H
+#endif // WAKE_H

@@ -74,14 +74,11 @@ void i2c_scanner(const struct device *bus) {
 int main(void) {
     int ret;
     printk("Starting wrls atreus\n");
+    k_msleep(50);
     init_leds();
-
-    for (int i = 0; i < 2; i++) {
-        led_on(0);
-        k_msleep(100);
-        led_off(0);
-        k_msleep(100);
-    }
+    
+    init_ui();
+    ui_send_startup();
 
     int err;
 
@@ -93,7 +90,6 @@ int main(void) {
 
     printk("Init key matrix\n");
     init_key_matrix();
-    init_ui();
     uint32_t last_active_time = k_uptime_seconds();
     uint32_t last_no_pressed_time = last_active_time;
 

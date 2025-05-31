@@ -21,11 +21,14 @@
 #include "pmic.h"
 #include "key_layout.h"
 #include "mandelbrot.h"
+#include "anim.h"
 #include "anim_wake.h"
+#include "anim_sleep.h"
+#include "anim_idle.h"
 
 #define THREAD_STACK_SIZE 1024
 #define PRIORITY 5
-#define UI_TIME_STEP_MS 100
+#define UI_TIME_STEP_MS 75
 #define UI_TIMEOUT_MS 10000
 
 
@@ -120,10 +123,10 @@ enum ui_page {
     UI_PAGE_DEBUG = 3,
     UI_PAGE_CONFIRM_PASSKEY = 4,
     UI_PAGE_DISPLAY_PASSKEY = 5,
-    UI_PAGE_WAKEUP = 6,
-    UI_PAGE_SWAP_CTRL_CMD = 7,
-    UI_PAGE_HELP = 8,
-    UI_PAGE_APPS = 9,
+    UI_PAGE_SWAP_CTRL_CMD = 6,
+    UI_PAGE_HELP = 7,
+    UI_PAGE_APPS = 8,
+    UI_PAGE_IDLE = 9,
     __UI_N_PAGES = 10,
 };
 struct anim_state {
@@ -145,6 +148,30 @@ struct ui_state {
 void open_page(struct ui_state *state, enum ui_page new_page) {
     state->current_page = new_page;
     state->page_state = (union ui_page_state){0};
+}
+
+bool show_animation(struct anim_state *state, struct animation *anim) {
+    if (state->frame_start_time == 0) {
+        state->frame_start_time = k_uptime_get();
+        state->frame_idx = anim->init_idx;
+    }
+    memcpy(displayBuffer, anim->frames[state->frame_idx], sizeof(displayBuffer));
+    lcd_display();
+    if (k_uptime_get() - state->frame_start_time > 100 * (int) anim->frame_counts[state->frame_idx]) {
+        if (state->frame_idx == anim->end_idx) {
+            if (anim->loop) {
+                state->frame_idx = anim->start_idx;
+                state->frame_start_time = k_uptime_get();
+            } else {
+                // animation finished
+                return false;
+            }
+        } else {
+            state->frame_idx += anim->frame_step;
+            state->frame_start_time = k_uptime_get();
+        }
+    }
+    return true;
 }
 
 // ----------------------------------------------------
@@ -196,7 +223,7 @@ void show_confirm_passkey_page(struct ui_message msg, struct ui_state *state) {
         // not too sure here, this means one UI cycle delay
         // sending a message instead would be immediate, but semantically
         // dubious
-        open_page(state, UI_PAGE_WAKEUP);
+        open_page(state, UI_PAGE_IDLE);
     }
 }
 
@@ -210,39 +237,18 @@ void show_display_passkey_page(struct ui_message msg, struct ui_state *state) {
     lcd_display();
 }
 
-void show_startup_page(struct ui_message msg, struct ui_state *state) {
-    lcd_goto_xpix_y(0, 3);
-    lcd_clear_buffer();
-    lcd_puts("Starting...");
-    lcd_display();
-}
-
 void show_shutdown_page(struct ui_message msg, struct ui_state *state) {
-    lcd_goto_xpix_y(0, 3);
-    lcd_clear_buffer();
-    lcd_puts("Shutting down...");
-    lcd_display();
-    k_msleep(500);
+    while (show_animation(&state->page_state.anim, &anim_sleep)) {
+        k_msleep(UI_TIME_STEP_MS);
+    }
     enter_ship_mode();
 }
 
-void show_wakeup_page(struct ui_message msg, struct ui_state *state) {
-    if (state->page_state.anim.frame_start_time == 0) {
-        state->page_state.anim.frame_start_time = k_uptime_get();
+void show_startup_page(struct ui_message msg, struct ui_state *state) {
+    bool anim_running = show_animation(&state->page_state.anim, &anim_wake);
+    if (!anim_running) {
+        open_page(state, UI_PAGE_IDLE);
     }
-    lcd_goto_xpix_y(48, 3);
-    memcpy(displayBuffer, anim_wake_frames[state->page_state.anim.frame_idx], sizeof(displayBuffer));
-    lcd_display();
-    if (k_uptime_get() - state->page_state.anim.frame_start_time > 100 * (int) anim_wake_frame_counts[state->page_state.anim.frame_idx]) {
-        if (state->page_state.anim.frame_idx < ANIM_WAKE_N_FRAMES - 1) {
-            state->page_state.anim.frame_idx++;
-            state->page_state.anim.frame_start_time = k_uptime_get();
-        } else {
-            open_page(state, UI_DISABLED);
-            disable_display();
-        }
-    }
-    
 }
 
 void show_swap_ctrl_cmd_page(struct ui_message msg, struct ui_state *state) {
@@ -261,7 +267,7 @@ void show_swap_ctrl_cmd_page(struct ui_message msg, struct ui_state *state) {
     }
     lcd_display();
     k_msleep(350);
-    open_page(state, UI_PAGE_WAKEUP);
+    open_page(state, UI_PAGE_IDLE);
 }
 
 void show_help_page(struct ui_message msg, struct ui_state *state) {
@@ -284,7 +290,7 @@ void show_apps_page(struct ui_message msg, struct ui_state *state) {
             run_mandelbrot();
             application_running = false;
         } else if (keq(msg.data.key, (struct key_coord){0, 0})) {
-            open_page(state, UI_PAGE_WAKEUP);
+            open_page(state, UI_PAGE_IDLE);
             return;
         }
     }
@@ -295,6 +301,10 @@ void show_apps_page(struct ui_message msg, struct ui_state *state) {
     lcd_goto_xpix_y(0, 6);
     lcd_puts("X: exit");
     lcd_display();
+}
+
+void show_idle_page(struct ui_message msg, struct ui_state *state) {
+    show_animation(&state->page_state.anim, &anim_idle);
 }
 
 struct ui_page_cfg {
@@ -312,8 +322,6 @@ struct ui_page_cfg ui_page_cfgs[__UI_N_PAGES];
 void init_ui_page_cfg() {
     ui_page_cfgs[UI_DISABLED] =
         (struct ui_page_cfg){NULL, UI_MESSAGE_TYPE_NOMSG, NO_KEY, true};
-    ui_page_cfgs[UI_PAGE_STARTUP] = (struct ui_page_cfg){
-        show_startup_page, UI_MESSAGE_TYPE_STARTUP, NO_KEY, false};
     ui_page_cfgs[UI_PAGE_SHUTDOWN] =
         (struct ui_page_cfg){show_shutdown_page,
                              UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED,
@@ -327,8 +335,8 @@ void init_ui_page_cfg() {
     ui_page_cfgs[UI_PAGE_DISPLAY_PASSKEY] =
         (struct ui_page_cfg){show_display_passkey_page,
                              UI_MESSAGE_TYPE_DISPLAY_PASSKEY, NO_KEY, true};
-    ui_page_cfgs[UI_PAGE_WAKEUP] = (struct ui_page_cfg){
-        show_wakeup_page, UI_MESSAGE_TYPE_WAKE_PRESSED, NO_KEY, true};
+    ui_page_cfgs[UI_PAGE_STARTUP] = (struct ui_page_cfg){
+        show_startup_page, UI_MESSAGE_TYPE_STARTUP, NO_KEY, true};
     ui_page_cfgs[UI_PAGE_SWAP_CTRL_CMD] =
         (struct ui_page_cfg){show_swap_ctrl_cmd_page,
                              UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {0, 4},
@@ -337,6 +345,8 @@ void init_ui_page_cfg() {
         show_help_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {0, 7}, true};
     ui_page_cfgs[UI_PAGE_APPS] = (struct ui_page_cfg){
         show_apps_page, UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED, {1, 2}, false};
+    ui_page_cfgs[UI_PAGE_IDLE] = (struct ui_page_cfg){
+        show_idle_page, UI_MESSAGE_TYPE_WAKE_PRESSED, NO_KEY, true};
 };
 
 void switch_page(struct ui_state *state, struct ui_message *msg) {
@@ -354,6 +364,14 @@ void switch_page(struct ui_state *state, struct ui_message *msg) {
 }
 
 static struct ui_state current_ui_state;
+
+void switch_off(struct ui_state *state) {
+    lcd_clear_buffer();
+    lcd_display();
+    k_msleep(10);
+    disable_display();
+    state->current_page = UI_DISABLED;
+}
 
 bool ui_active() { return current_ui_state.current_page != UI_DISABLED; }
 
@@ -386,10 +404,8 @@ void ui_thread() {
                 switch_page(state, &msg);
             }
         }
-        if (k_uptime_get() - state->last_msg_time > UI_TIMEOUT_MS) {
-            disable_display();
-            // TODO: ui sleep page?
-            state->current_page = UI_DISABLED;
+        if ((k_uptime_get() - state->last_msg_time) > UI_TIMEOUT_MS) {
+            switch_off(state);
             continue;
         }
         if (state->current_page != UI_DISABLED) {
