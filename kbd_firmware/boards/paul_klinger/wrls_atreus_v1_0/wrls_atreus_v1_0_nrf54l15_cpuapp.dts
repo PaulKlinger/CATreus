@@ -278,7 +278,7 @@
 	};
 
 	status = "okay";
-	clock-frequency = <I2C_BITRATE_STANDARD>;
+	clock-frequency = <I2C_BITRATE_FAST>;
 	pinctrl-0 = <&i2c21_default>;
 	pinctrl-names = "default";
 	zephyr,concat-buf-size = <0x2048>;

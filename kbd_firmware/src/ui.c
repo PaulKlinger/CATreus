@@ -21,6 +21,7 @@
 #include "pmic.h"
 #include "key_layout.h"
 #include "mandelbrot.h"
+#include "anim_wake.h"
 
 #define THREAD_STACK_SIZE 1024
 #define PRIORITY 5
@@ -125,8 +126,13 @@ enum ui_page {
     UI_PAGE_APPS = 9,
     __UI_N_PAGES = 10,
 };
+struct anim_state {
+    uint32_t frame_idx;
+    int64_t frame_start_time;
+};
 union ui_page_state {
-    uint32_t idx; // e.g. frame index, menu index, etc.
+    uint32_t idx; // e.g. menu index, etc.
+    struct anim_state anim;
     unsigned int passkey;
 };
 
@@ -221,10 +227,22 @@ void show_shutdown_page(struct ui_message msg, struct ui_state *state) {
 }
 
 void show_wakeup_page(struct ui_message msg, struct ui_state *state) {
+    if (state->page_state.anim.frame_start_time == 0) {
+        state->page_state.anim.frame_start_time = k_uptime_get();
+    }
     lcd_goto_xpix_y(48, 3);
-    lcd_clear_buffer();
-    lcd_puts("^ _ ^");
+    memcpy(displayBuffer, anim_wake_frames[state->page_state.anim.frame_idx], sizeof(displayBuffer));
     lcd_display();
+    if (k_uptime_get() - state->page_state.anim.frame_start_time > 100 * (int) anim_wake_frame_counts[state->page_state.anim.frame_idx]) {
+        if (state->page_state.anim.frame_idx < ANIM_WAKE_N_FRAMES - 1) {
+            state->page_state.anim.frame_idx++;
+            state->page_state.anim.frame_start_time = k_uptime_get();
+        } else {
+            open_page(state, UI_DISABLED);
+            disable_display();
+        }
+    }
+    
 }
 
 void show_swap_ctrl_cmd_page(struct ui_message msg, struct ui_state *state) {
