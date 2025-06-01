@@ -112,13 +112,13 @@ static void reset_snake(SnakeGamestate *gs) {
 }
 
 void run_snake() {
+    wait_for_wake_release();
+    
     SnakeGamestate snake_state = {0};
     reset_snake(&snake_state);
     
     uint8_t snake_prev_tail_x;
     uint8_t snake_prev_tail_y;
-
-    wait_for_wake_release();
     
     while (1) {
         snake_prev_tail_x = snake_state.tail_x;

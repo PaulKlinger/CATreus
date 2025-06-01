@@ -15,10 +15,10 @@
 #include <zephyr/sys/printk.h>
 #include <zephyr/types.h>
 
-#include "anim.h"
-#include "anim_idle.h"
-#include "anim_sleep.h"
-#include "anim_wake.h"
+#include "animations/anim.h"
+#include "animations/anim_idle.h"
+#include "animations/anim_sleep.h"
+#include "animations/anim_wake.h"
 #include "bluetooth.h"
 #include "config.h"
 #include "display.h"
