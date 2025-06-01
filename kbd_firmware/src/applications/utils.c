@@ -8,7 +8,7 @@ void wait_for_wake_release() {
   while (wake_pressed()) {
     k_msleep(10);
   }
-  k_msleep(20);
+  k_msleep(100);
 }
 void wait_for_wake() {
   while (!wake_pressed()) {

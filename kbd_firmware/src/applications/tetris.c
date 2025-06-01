@@ -282,6 +282,7 @@ void run_tetris(void) {
     while (state.piece_moving) {
       enum AppKey key = read_key();
       if (key == APP_KEY_EXIT) {
+        return;
       } else if (key != APP_KEY_NONE) {
         joystick_pressed_counter++;
         switch (key) {
@@ -303,9 +304,9 @@ void run_tetris(void) {
           case APP_KEY_DOWN:
             move_piece_down_and_collide(&state);
             break;
+          case APP_KEY_EXIT:
           case APP_KEY_SELECT:
           case APP_KEY_BACK:
-          case APP_KEY_EXIT:
           case APP_KEY_NONE:
         }
       } else {
