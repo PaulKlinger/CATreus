@@ -1,2 +1,3 @@
-keyboard/keyboard-backups
-keyboard/fp-info-cache
+pcb/keyboard-backups
+pcb/fp-info-cache
+pcb/_*
