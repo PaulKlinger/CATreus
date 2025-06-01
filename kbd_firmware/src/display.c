@@ -10,6 +10,7 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/types.h>
+#include <math.h>
 
 const char FONT[][6] = {
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00},  // sp
@@ -258,9 +259,19 @@ void lcd_clear_buffer() {
     }
 }
 
+uint8_t lcd_check_buffer(uint8_t x, uint8_t y) {
+    return displayBuffer[(y / (DISPLAY_HEIGHT/8))][x] & (1 << (y % (DISPLAY_HEIGHT/8)));
+}
+
+
 void lcd_display() {
     lcd_send_home_command();
     lcd_data(&displayBuffer[0][0], DISPLAY_WIDTH * DISPLAY_HEIGHT / 8);
+}
+void lcd_clrscr(void){
+    lcd_clear_buffer();
+    lcd_display();
+    lcd_send_home_command();
 }
 
 bool display_enabled(void) { return regulator_is_enabled(disp_ldsw); }
@@ -315,4 +326,79 @@ void lcd_display_block(uint8_t x, uint8_t line, uint8_t width) {
     }
     lcd_send_goto_xpix_y(x,line);
     lcd_data(&displayBuffer[line][x], width);
+}
+
+void lcd_drawLine(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t color){
+    if(x1 > DISPLAY_WIDTH-1 ||
+       x2 > DISPLAY_WIDTH-1 ||
+       y1 > DISPLAY_HEIGHT-1 ||
+       y2 > DISPLAY_HEIGHT-1) return;
+    int dx =  abs(x2-x1), sx = x1<x2 ? 1 : -1;
+    int dy = -abs(y2-y1), sy = y1<y2 ? 1 : -1;
+    int err = dx+dy, e2; /* error value e_xy */
+    
+    while(1){
+        lcd_drawPixel(x1, y1, color);
+        if (x1==x2 && y1==y2) break;
+        e2 = 2*err;
+        if (e2 > dy) { err += dy; x1 += sx; } /* e_xy+e_x > 0 */
+        if (e2 < dx) { err += dx; y1 += sy; } /* e_xy+e_y < 0 */
+    }
+}
+
+void lcd_fillRect(uint8_t px1, uint8_t py1, uint8_t px2, uint8_t py2, uint8_t color){
+    for (uint8_t i=0; i<=(py2-py1); i++){
+        lcd_drawLine(px1, py1+i, px2, py1+i, color);
+    }
+}
+
+void lcd_fillTriangle(int16_t x1, int8_t y1, int16_t x2, int8_t y2,
+                      int16_t x3, int8_t y3, uint8_t color) {
+    // Negative and too large coords are allowed, only the visible part will
+    // be drawn
+    
+    // calc bounds for increased performance (todo: is there a better way?)
+    int16_t xmin = (x1 < x2 ? (x1 < x3 ? x1 : x3) : (x2 < x3 ? x2 : x3 ));
+    if (xmin < 0) xmin=0;
+    int16_t xmax = (x1 > x2 ? (x1 > x3 ? x1 : x3) : (x2 > x3 ? x2 : x3 ));
+    if (xmax > DISPLAY_WIDTH-1) xmax = DISPLAY_WIDTH - 1;
+    
+    int8_t ymin = (y1 < y2 ? (y1 < y3 ? y1 : y3) : (y2 < y3 ? y2 : y3 ));
+    if (ymin < 0) ymin=0;
+    int8_t ymax = (y1 > y2 ? (y1 > y3 ? y1 : y3) : (y2 > y3 ? y2 : y3 ));
+    if (ymax > DISPLAY_HEIGHT-1) ymax = DISPLAY_HEIGHT - 1;
+    
+    for (uint8_t x = xmin; x<=xmax; x++) {
+        for (uint8_t y = ymin; y <= ymax; y++) {
+            // point in triangle code from John Bananas on stackoverflow
+            // https://stackoverflow.com/a/9755252/7089433
+            int8_t p1x = x - x1;
+            int8_t p1y = y - y1;
+            uint8_t s12 = (x2 - x1) * p1y - (y2 - y1) * p1x > 0;
+            if (((x3 - x1) * p1y - (y3 - y1) * p1x > 0) == s12) continue;
+            if (((x3 - x2) * (y - y2) - (y3 - y2) * (x - x2) > 0) != s12) continue;
+            lcd_drawPixel(x, y, color);
+        }
+    }
+}
+
+
+void lcd_fillCircleSimple(uint8_t center_x, uint8_t center_y, int16_t radius, uint8_t color) {
+    for (int16_t dx=-radius; dx <= radius; dx++) {
+        for (int16_t dy=-radius; dy <= radius; dy++) {
+            if (dx * dx + dy * dy < radius * radius) {
+                if (center_x + dx >= DISPLAY_WIDTH || center_x + dx < 0
+                    || center_y + dy >= DISPLAY_HEIGHT || center_y + dy < 0) continue;
+                lcd_drawPixel(center_x + dx, center_y + dy, color);
+            }
+        }
+    }
+}
+
+
+void lcd_drawRect(uint8_t px1, uint8_t py1, uint8_t px2, uint8_t py2, uint8_t color){
+    lcd_drawLine(px1, py1, px2, py1, color);
+    lcd_drawLine(px2, py1, px2, py2, color);
+    lcd_drawLine(px2, py2, px1, py2, color);
+    lcd_drawLine(px1, py2, px1, py1, color);
 }

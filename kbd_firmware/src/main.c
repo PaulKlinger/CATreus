@@ -28,7 +28,6 @@
 #include "key_layout.h"
 #include "key_matrix.h"
 #include "leds.h"
-#include "mandelbrot.h"
 #include "ui.h"
 #include "nvs.h"
 

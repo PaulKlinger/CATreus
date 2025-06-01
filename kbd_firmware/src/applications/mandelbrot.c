@@ -1,21 +1,15 @@
 #include "mandelbrot.h"
 
-
-#include <zephyr/kernel.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <zephyr/kernel.h>
 
-#include "config.h"
-#include "display.h"
-#include "key_matrix.h"
+#include "../config.h"
+#include "../display.h"
+#include "utils.h"
 
 #define init_scale 32  // pixels per unit
-
-typedef struct {
-    float x, y;
-} Vec;
-Vec add(Vec a, Vec b) { return (Vec){a.x + b.x, a.y + b.y}; }
 
 struct ScreenLoc {
     Vec center;
@@ -50,7 +44,6 @@ static uint8_t get_maxiter(struct ScreenLoc *screen) {
     if (screen->scale <= init_scale * 8) return 30;
     return 40;
 }
-
 
 static void display_mandelbrot_block(struct ScreenLoc *screen, uint8_t x,
                                      uint8_t xmax, uint8_t line) {
@@ -141,18 +134,19 @@ void run_mandelbrot() {
         .center = {0, 0}, .scale = init_scale, .filled_blocks = 0};
 
     display_complete_mandelbrot(&screen);
-    while (current_pressed_keys.wake_pressed){k_msleep(10);}
-    k_msleep(50);  // Wait for display to turn on
+    wait_for_wake_release();
 
     while (1) {
-        while (1) {
-            if (current_pressed_keys.keys[0].row == 1 && current_pressed_keys.keys[0].col == 2) {
+        switch (read_key()) {
+            case APP_KEY_SELECT:
                 screen.scale *= 2;
                 display_complete_mandelbrot(&screen);
-                while (current_pressed_keys.n_pressed > 0) {k_msleep(10);}
+                while (current_pressed_keys.n_pressed > 0) {
+                    k_msleep(10);
+                }
                 k_msleep(100);
                 break;
-            } else if (current_pressed_keys.keys[0].row == 0 && current_pressed_keys.keys[0].col == 1) {
+            case APP_KEY_BACK:
                 screen.scale /= 2;
                 display_complete_mandelbrot(&screen);
                 while (current_pressed_keys.n_pressed > 0) {
@@ -160,22 +154,20 @@ void run_mandelbrot() {
                 }
                 k_msleep(100);
                 break;
-            } else if (current_pressed_keys.keys[0].row == 1 && current_pressed_keys.keys[0].col == 1) {
+            case APP_KEY_LEFT:
                 move_left(&screen);
                 break;
-            } else if (current_pressed_keys.keys[0].row == 1 && current_pressed_keys.keys[0].col == 3) {
+            case APP_KEY_RIGHT:
                 move_right(&screen);
                 break;
-            } else if (current_pressed_keys.keys[0].row == 0 && current_pressed_keys.keys[0].col == 2) {
+            case APP_KEY_UP:
                 move_up(&screen);
                 break;
-            } else if (current_pressed_keys.keys[0].row == 2 && current_pressed_keys.keys[0].col == 2) {
+            case APP_KEY_DOWN:
                 move_down(&screen);
                 break;
-            } else if (current_pressed_keys.wake_pressed) {
+            case APP_KEY_EXIT:
                 return;
-            }
-            k_msleep(10);
         }
         k_msleep(50);
     }

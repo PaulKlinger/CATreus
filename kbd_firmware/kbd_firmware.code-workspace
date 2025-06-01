@@ -37,7 +37,12 @@
 			"bluetooth.h": "c",
 			"config.h": "c",
 			"anim_wake.h": "c",
-			"uuid.h": "c"
+			"uuid.h": "c",
+			"utils.h": "c",
+			"string.h": "c",
+			"cmath": "c",
+			"numeric": "c",
+			"xhash": "c"
 		}
 	}
 }

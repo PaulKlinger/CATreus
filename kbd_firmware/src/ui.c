@@ -24,7 +24,14 @@
 #include "display.h"
 #include "key_layout.h"
 #include "key_matrix.h"
-#include "mandelbrot.h"
+#include "applications/breakout.h"
+#include "applications/gol.h"
+#include "applications/lander.h"
+#include "applications/mandelbrot.h"
+#include "applications/mines.h"
+#include "applications/snake.h"
+#include "applications/tetris.h"
+
 #include "pmic.h"
 #include "nvs.h"
 
@@ -285,13 +292,35 @@ void show_help_page(struct ui_message msg, struct ui_state *state) {
     lcd_display();
 }
 
+void run_application(void (*app_func)(void)) {
+    application_running = true;
+    app_func();
+    application_running = false;
+}
+
 void show_apps_page(struct ui_message msg, struct ui_state *state) {
     if (msg.type == UI_MESSAGE_TYPE_WAKE_AND_KEY_PRESSED) {
-        if (keq(msg.data.key, (struct key_coord){2, 7})) {
+        if (keq(msg.data.key, (struct key_coord){2, 6})) {
+            // Start breakout app
+            run_application(run_breakout);
+        } else if (keq(msg.data.key, (struct key_coord){0, 8})) {
+            // Start gol app
+            run_application(run_gol);
+        } else if (keq(msg.data.key, (struct key_coord){0, 2})) {
+            // Start lander app
+            run_application(run_lander);
+        } else if (keq(msg.data.key, (struct key_coord){2, 7})) {
             // Start mandelbrot app
-            application_running = true;
-            run_mandelbrot();
-            application_running = false;
+            run_application(run_mandelbrot);
+        } else if (keq(msg.data.key, (struct key_coord){1, 1})) {
+            // Start mines app
+            run_application(run_mines);
+        } else if (keq(msg.data.key, (struct key_coord){1, 6})) {
+            // Start snake app
+            run_application(run_snake);
+        }else if (keq(msg.data.key, (struct key_coord){1, 9})) {
+            // Start tetris app
+            run_application(run_tetris);
         } else if (keq(msg.data.key, (struct key_coord){0, 0})) {
             open_page(state, UI_PAGE_IDLE);
             return;
@@ -300,6 +329,9 @@ void show_apps_page(struct ui_message msg, struct ui_state *state) {
     lcd_goto_xpix_y(0, 0);
     lcd_clear_buffer();
     lcd_puts("wake + <key> to start\n");
+    lcd_puts("B: breakout G: GOL\n");
+    lcd_puts("L: lander   I: mines\n");
+    lcd_puts("S: snake    T: tetris\n");
     lcd_puts("M: mandelbrot\n");
     lcd_goto_xpix_y(0, 6);
     lcd_puts("X: exit");
