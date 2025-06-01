@@ -15,6 +15,8 @@ A wireless keyboard based on the Keyboardio Atreus.
 * 4 status LEDs, 1 charge LED
 * 3D printed [case](/case)
 * custom [firmware](/kbd_firmware)
+* Kailh Midnight Pro Silent Switches
+* MAO profile keycaps ([from Aliexpress](https://www.aliexpress.com/item/1005008664883621.html))
 
 Key layout is hardcoded in the firware, I'm using a NEO2 based layout.
 
