@@ -62,16 +62,17 @@ uint16_t nvs_read_n_boot() {
 struct ctrl_cmd_configs nvs_read_ctrl_cmd_configs() {
     struct ctrl_cmd_configs cfgs = {0};
     int ret = nvs_read(&fs, CTRL_CMD, &cfgs, sizeof(cfgs));
+    
     return (ret < 0) ? (struct ctrl_cmd_configs){0} : cfgs;
 }
 
+
 void nvs_store_ctrl_cmd(bool swap_ctrl_cmd) {
     struct addr addr = get_current_addr();
-
     struct ctrl_cmd_configs cfgs = nvs_read_ctrl_cmd_configs();
     bool found = false;
     for (int i = 0; i < cfgs.n_configs; i++) {
-        if (memcmp(cfgs.configs[i].addr, addr.addr, sizeof(addr.addr)) == 0) {
+        if (strcmp(cfgs.configs[i].addr, addr.addr) == 0) {
             found = true;
             cfgs.configs[i].swap_ctrl_cmd = swap_ctrl_cmd;
         }
@@ -80,7 +81,7 @@ void nvs_store_ctrl_cmd(bool swap_ctrl_cmd) {
         struct ctrl_cmd_config new_config = {
             .swap_ctrl_cmd = swap_ctrl_cmd,
         };
-        memcpy(new_config.addr, addr.addr, sizeof(new_config.addr));
+        strcpy(new_config.addr, addr.addr);
         if (cfgs.n_configs >= CONFIG_BT_MAX_PAIRED) {
             // storage full, get rid of oldest config
             for (int i = 0; i < CONFIG_BT_MAX_PAIRED - 1; i++) {
@@ -99,7 +100,7 @@ bool nvs_get_ctrl_cmd_config() {
     struct ctrl_cmd_configs cfgs = nvs_read_ctrl_cmd_configs();
     struct addr addr = get_current_addr();
     for (int i = 0; i < cfgs.n_configs; i++) {
-        if (memcmp(cfgs.configs[i].addr, addr.addr, sizeof(addr.addr)) == 0) {
+        if (strcmp(cfgs.configs[i].addr, addr.addr) == 0) {
             return cfgs.configs[i].swap_ctrl_cmd;
         }
     }
