@@ -1,5 +1,6 @@
 pcb/keyboard-backups
 pcb/fp-info-cache
 pcb/_*
+pcb/~*
 anim/frames
 anim/.ipynb_checkpoints
