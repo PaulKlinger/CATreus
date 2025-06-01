@@ -1,8 +1,8 @@
 #ifndef KEY_LAYOUT_H
 #define KEY_LAYOUT_H
 
-
 #include <stdint.h>
+
 #include "config.h"
 
 struct encoded_keys get_encoded_keys();
@@ -13,4 +13,4 @@ void swap_ctrl_cmd();
 
 void init_key_layout();
 
-#endif // KEY_LAYOUT_H
+#endif  // KEY_LAYOUT_H

@@ -6,4 +6,4 @@
 #define SLEEP_N_FRAMES 15
 extern struct animation anim_sleep;
 
-#endif // SLEEP_H
+#endif  // SLEEP_H

@@ -3,4 +3,4 @@
 
 void run_snake();
 
-#endif // SNAKE_H
+#endif  // SNAKE_H

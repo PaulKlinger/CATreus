@@ -2,6 +2,7 @@
 #define UI_H
 
 #include <stdbool.h>
+
 #include "config.h"
 
 extern bool application_running;
@@ -26,4 +27,4 @@ void suspend_ui();
 
 void resume_ui();
 
-#endif // UI_H
+#endif  // UI_H

@@ -5,50 +5,47 @@
 
 #include "config.h"
 #include "key_matrix.h"
+#include "nvs.h"
 #include "usb_hid_keys.h"
 
-#include "nvs.h"
-
 enum key_layer {
-    LAYER_0 = 0,
-    LAYER_2 = 2,
-    LAYER_3 = 3,
-    LAYER_5 = 5,
+  LAYER_0 = 0,
+  LAYER_2 = 2,
+  LAYER_3 = 3,
+  LAYER_5 = 5,
 };
 
 // key with active layer at the time it was pressed
 
 /*
-_______________________________________________________________________________
-| Why do we need to keep state here?                                           |
-| We can't determine the current state of the keys just from the pressed keys, |
-| because we want to keep the layer state at the time each key was pressed.    |
-| E.g. when typing "a_b", if the a is held down for a fraction of a second     |
-| too long, overlapping with shifting to layer 3, then we'd type "a{_b",       |
-| because to the host { looks like a new keypress, so the repeating delay      |
-| doesn't apply.                                                               |
-|                                                                              |
-| To prevent this we keep track of the layer at the time each key was pressed, |
-| so we'd still send "a" to the host even after the layer changed to 3.        |
-|______________________________________________________________________________|
-*/
+   _______________________________________________________________________________
+ | Why do we need to keep state here? | | We can't determine the current state
+ of the keys just from the pressed keys, | | because we want to keep the layer
+ state at the time each key was pressed.    | | E.g. when typing "a_b", if the a
+ is held down for a fraction of a second     | | too long, overlapping with
+ shifting to layer 3, then we'd type "a{_b",       | | because to the host {
+ looks like a new keypress, so the repeating delay      | | doesn't apply. | | |
+ | To prevent this we keep track of the layer at the time each key was pressed,
+ | | so we'd still send "a" to the host even after the layer changed to 3. |
+ |______________________________________________________________________________|
+ */
 
 struct key_with_layer {
-    struct key_coord coord;
-    enum key_layer layer;
+  struct key_coord coord;
+  enum key_layer layer;
 };
 
 // state of currently active keys
 struct active_keys_state {
-    struct key_with_layer keys[MAX_N_PRESSED_KEYS];
-    uint8_t n_active;  // number of active keys
+  struct key_with_layer keys[MAX_N_PRESSED_KEYS];
+  uint8_t n_active;  // number of active keys
 };
 
 struct active_keys_state current_active_keys = {0};
 
 struct key_with_mod {
-    uint8_t key;  // HID key code
-    uint8_t mod;  // Modifier key mask (e.g., KEY_MOD_LCTRL)
+  uint8_t key;  // HID key code
+  uint8_t mod;  // Modifier key mask (e.g., KEY_MOD_LCTRL)
 };
 
 struct key_coord layer_2_key = {3, 7};
@@ -199,7 +196,7 @@ struct key_with_mod key_map_layer_3[4][11] = {
         {KEY_BACKSLASH, KEY_MOD_LSHIFT},  // |
         {KEY_GRAVE, KEY_MOD_LSHIFT},      // ~
         {KEY_GRAVE, 0},
-        {KEY_KPPLUS, 0},       // +
+        {KEY_KPPLUS, 0},                   // +
         {KEY_5, KEY_MOD_LSHIFT},           // %
         {KEY_APOSTROPHE, KEY_MOD_LSHIFT},  // "
         {KEY_APOSTROPHE, 0},
@@ -252,145 +249,141 @@ struct key_with_mod key_map_layer_5[4][11] = {
 };
 
 enum key_layer get_active_layer(struct pressed_keys keys) {
-    if (keys.n_pressed == 0) {
-        return LAYER_0;  // Default layer
-    }
+  if (keys.n_pressed == 0) {
+    return LAYER_0;  // Default layer
+  }
 
-    // Check for specific keys to determine the active layer
-    for (uint8_t i = 0; i < keys.n_pressed; i++) {
-        if (keys.keys[i].row == layer_2_key.row &&
-            keys.keys[i].col == layer_2_key.col) {
-            return LAYER_2;
-        } else if (keys.keys[i].row == layer_3_key.row &&
-                   keys.keys[i].col == layer_3_key.col) {
-            return LAYER_3;
-        } else if (keys.keys[i].row == layer_5_key.row &&
-                   keys.keys[i].col == layer_5_key.col) {
-            return LAYER_5;
-        }
+  // Check for specific keys to determine the active layer
+  for (uint8_t i = 0; i < keys.n_pressed; i++) {
+    if (keys.keys[i].row == layer_2_key.row &&
+        keys.keys[i].col == layer_2_key.col) {
+      return LAYER_2;
+    } else if (keys.keys[i].row == layer_3_key.row &&
+               keys.keys[i].col == layer_3_key.col) {
+      return LAYER_3;
+    } else if (keys.keys[i].row == layer_5_key.row &&
+               keys.keys[i].col == layer_5_key.col) {
+      return LAYER_5;
     }
+  }
 
-    return LAYER_0;  // Default to layer 0 if no special keys are pressed
+  return LAYER_0;  // Default to layer 0 if no special keys are pressed
 }
 
 struct key_with_mod get_key_with_mod(struct key_with_layer key) {
-    struct key_with_mod res = {0, 0};
-    switch (key.layer) {
-        case LAYER_0:
-            return key_map_layer_0[key.coord.row][key.coord.col];
-        case LAYER_2:
-            res = key_map_layer_2[key.coord.row][key.coord.col];
-            break;
-        case LAYER_3:
-            res = key_map_layer_3[key.coord.row][key.coord.col];
-            break;
-        case LAYER_5:
-            res = key_map_layer_5[key.coord.row][key.coord.col];
-            break;
-    }
-    if (res.key == 0) {
-        return key_map_layer_0[key.coord.row]
-                              [key.coord.col];  // Fallback to layer 0 if no key
-                                                // found
-    }
-    return res;
+  struct key_with_mod res = {0, 0};
+  switch (key.layer) {
+    case LAYER_0:
+      return key_map_layer_0[key.coord.row][key.coord.col];
+    case LAYER_2:
+      res = key_map_layer_2[key.coord.row][key.coord.col];
+      break;
+    case LAYER_3:
+      res = key_map_layer_3[key.coord.row][key.coord.col];
+      break;
+    case LAYER_5:
+      res = key_map_layer_5[key.coord.row][key.coord.col];
+      break;
+  }
+  if (res.key == 0) {
+    return key_map_layer_0[key.coord.row][key.coord.col];  // Fallback to layer
+                                                           // 0 if no key found
+  }
+  return res;
 }
 
 void update_active_keys_state() {
-    // update active keys state based on currently pressed keys
-    
-    struct pressed_keys keys = current_pressed_keys;
-    enum key_layer current_layer = get_active_layer(keys);
+  // update active keys state based on currently pressed keys
 
-    struct active_keys_state new_active_keys = {0};
-    // keep all the keys that are still pressed
-    for (uint8_t i = 0; i < current_active_keys.n_active; i++) {
-        bool still_pressed = false;
-        for (uint8_t j = 0; j < keys.n_pressed; j++) {
-            if (keq(current_active_keys.keys[i].coord, keys.keys[j])) {
-                still_pressed = true;
-                break;
-            }
-        }
-        if (still_pressed) {
-            new_active_keys.keys[new_active_keys.n_active] =
-                current_active_keys.keys[i];
-            new_active_keys.n_active++;
-        }
-    }
+  struct pressed_keys keys = current_pressed_keys;
+  enum key_layer current_layer = get_active_layer(keys);
 
-    // add new pressed keys
-    for (uint8_t i = 0; i < keys.n_pressed; i++) {
-        bool new_pressed = true;
-        for (uint8_t j = 0; j < new_active_keys.n_active; j++) {
-            if (keq(new_active_keys.keys[j].coord, keys.keys[i])) {
-                new_pressed = false;
-                break;
-            }
-        }
-        if (new_pressed && new_active_keys.n_active < MAX_N_PRESSED_KEYS) {
-            // Add new key to active keys state
-            new_active_keys.keys[new_active_keys.n_active].coord =
-                keys.keys[i];
-            new_active_keys.keys[new_active_keys.n_active].layer =
-                current_layer;
-            new_active_keys.n_active++;
-        }
+  struct active_keys_state new_active_keys = {0};
+  // keep all the keys that are still pressed
+  for (uint8_t i = 0; i < current_active_keys.n_active; i++) {
+    bool still_pressed = false;
+    for (uint8_t j = 0; j < keys.n_pressed; j++) {
+      if (keq(current_active_keys.keys[i].coord, keys.keys[j])) {
+        still_pressed = true;
+        break;
+      }
     }
-    current_active_keys = new_active_keys;
+    if (still_pressed) {
+      new_active_keys.keys[new_active_keys.n_active] =
+          current_active_keys.keys[i];
+      new_active_keys.n_active++;
+    }
+  }
+
+  // add new pressed keys
+  for (uint8_t i = 0; i < keys.n_pressed; i++) {
+    bool new_pressed = true;
+    for (uint8_t j = 0; j < new_active_keys.n_active; j++) {
+      if (keq(new_active_keys.keys[j].coord, keys.keys[i])) {
+        new_pressed = false;
+        break;
+      }
+    }
+    if (new_pressed && new_active_keys.n_active < MAX_N_PRESSED_KEYS) {
+      // Add new key to active keys state
+      new_active_keys.keys[new_active_keys.n_active].coord = keys.keys[i];
+      new_active_keys.keys[new_active_keys.n_active].layer = current_layer;
+      new_active_keys.n_active++;
+    }
+  }
+  current_active_keys = new_active_keys;
 }
 
 struct encoded_keys get_encoded_keys() {
-    update_active_keys_state();
+  update_active_keys_state();
 
-    struct encoded_keys encoded = {0};
-    uint8_t n_keys = 0;
-    for (uint8_t i = 0; i < current_active_keys.n_active; i++) {
-        struct key_with_mod k_mod =
-            get_key_with_mod(current_active_keys.keys[i]);
-        if (k_mod.key != 0) {
-            if (n_keys < MAX_N_ENCODED_KEYS) {
-                encoded.keys[n_keys] = k_mod.key;
-                encoded.modifier_mask |= k_mod.mod;
-                n_keys++;
-            } else {
-                // Set all keys to KEY_ERR_OVF if overflow occurs
-                for (uint8_t j = 0; j < MAX_N_ENCODED_KEYS; j++) {
-                    encoded.keys[j] = KEY_ERR_OVF;
-                }
-                break;
-            }
+  struct encoded_keys encoded = {0};
+  uint8_t n_keys = 0;
+  for (uint8_t i = 0; i < current_active_keys.n_active; i++) {
+    struct key_with_mod k_mod = get_key_with_mod(current_active_keys.keys[i]);
+    if (k_mod.key != 0) {
+      if (n_keys < MAX_N_ENCODED_KEYS) {
+        encoded.keys[n_keys] = k_mod.key;
+        encoded.modifier_mask |= k_mod.mod;
+        n_keys++;
+      } else {
+        // Set all keys to KEY_ERR_OVF if overflow occurs
+        for (uint8_t j = 0; j < MAX_N_ENCODED_KEYS; j++) {
+          encoded.keys[j] = KEY_ERR_OVF;
         }
+        break;
+      }
     }
-    return encoded;
+  }
+  return encoded;
 }
 
 bool ctrl_cmd_swapped = false;
 
 void swap_ctrl_cmd_in_keymap() {
-    // Swap Ctrl and Cmd keys in the key map
-    for (int row = 0; row < 4; row++) {
-        for (int col = 0; col < 11; col++) {
-            if (key_map_layer_0[row][col].key == KEY_LEFTCTRL) {
-                key_map_layer_0[row][col].key = KEY_LEFTMETA;
-                key_map_layer_0[row][col].mod = KEY_MOD_LMETA;
-            } else if (key_map_layer_0[row][col].key == KEY_LEFTMETA) {
-                key_map_layer_0[row][col].key = KEY_LEFTCTRL;
-                key_map_layer_0[row][col].mod = KEY_MOD_LCTRL;
-            }
-        }
+  // Swap Ctrl and Cmd keys in the key map
+  for (int row = 0; row < 4; row++) {
+    for (int col = 0; col < 11; col++) {
+      if (key_map_layer_0[row][col].key == KEY_LEFTCTRL) {
+        key_map_layer_0[row][col].key = KEY_LEFTMETA;
+        key_map_layer_0[row][col].mod = KEY_MOD_LMETA;
+      } else if (key_map_layer_0[row][col].key == KEY_LEFTMETA) {
+        key_map_layer_0[row][col].key = KEY_LEFTCTRL;
+        key_map_layer_0[row][col].mod = KEY_MOD_LCTRL;
+      }
     }
+  }
 }
 
 void swap_ctrl_cmd() {
-    ctrl_cmd_swapped = !ctrl_cmd_swapped;
-    swap_ctrl_cmd_in_keymap();
-    nvs_store_ctrl_cmd(ctrl_cmd_swapped);
+  ctrl_cmd_swapped = !ctrl_cmd_swapped;
+  swap_ctrl_cmd_in_keymap();
+  nvs_store_ctrl_cmd(ctrl_cmd_swapped);
 }
 
 void init_key_layout() {
-    if (nvs_get_ctrl_cmd_config() != ctrl_cmd_swapped) {
-        ctrl_cmd_swapped = !ctrl_cmd_swapped;
-        swap_ctrl_cmd_in_keymap();
-    }
+  if (nvs_get_ctrl_cmd_config() != ctrl_cmd_swapped) {
+    ctrl_cmd_swapped = !ctrl_cmd_swapped;
+    swap_ctrl_cmd_in_keymap();
+  }
 }

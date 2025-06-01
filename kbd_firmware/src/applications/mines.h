@@ -3,4 +3,4 @@
 
 void run_mines();
 
-#endif // MINES_H
+#endif  // MINES_H

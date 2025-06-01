@@ -3,4 +3,4 @@
 
 void run_gol();
 
-#endif // GOL_H
+#endif  // GOL_H

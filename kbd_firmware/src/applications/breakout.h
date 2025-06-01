@@ -3,4 +3,4 @@
 
 void run_breakout();
 
-#endif // BREAKOUT_H
+#endif  // BREAKOUT_H

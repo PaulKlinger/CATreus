@@ -10,4 +10,4 @@ void led_off(uint8_t led);
 void led_start_advertising_anim(void);
 void led_stop_anim(void);
 
-#endif // LEDS_H
+#endif  // LEDS_H

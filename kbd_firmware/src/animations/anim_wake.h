@@ -6,4 +6,4 @@
 #define WAKE_N_FRAMES 26
 extern struct animation anim_wake;
 
-#endif // WAKE_H
+#endif  // WAKE_H
