@@ -1,10 +1,6 @@
-################
-CATreus
-################
+# CATreus
 
-
-.. image:: photo.jpg
-   :width: 600px
+![photo of keyboard](photo.jpg)
 
 A wireless keyboard based on the Keyboardio Atreus.
 
@@ -20,15 +16,14 @@ A wireless keyboard based on the Keyboardio Atreus.
 
 Key layout is hardcoded in the firware, I'm using a NEO2 based layout.
 
-Notes
--------
+## Notes
 
 Programmed via the 5 holes on the top next to the leds, using a custom pogo pin connector. 
 Spacing is 2.54mm, so can just solder pogo pins to a piece of protoboard.
 pinout:
 ```
-NC    RESET   GND
-3V3   SWDIO   SWCLK
+   NC    RESET   GND
+   3V3   SWDIO   SWCLK
 ```
 
 Wake button is top left of the center 4 buttons, used to wake the keyboard from sleep mode (30min of inactivity).
