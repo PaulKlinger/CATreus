@@ -13,6 +13,7 @@ A wireless keyboard based on the Keyboardio Atreus.
 * custom [firmware](/kbd_firmware)
 * Kailh Midnight Pro Silent Switches
 * MAO profile keycaps ([from Aliexpress](https://www.aliexpress.com/item/1005008664883621.html))
+* cat animations by John William Bond (u/Kaimatten), [original video](https://www.reddit.com/r/PixelArt/comments/hoxd95/1_minute_of_1_bit_cat_animations)
 
 Key layout is hardcoded in the firware, I'm using a NEO2 based layout.
 
