@@ -47,16 +47,6 @@ int nvs_init() {
   return 0;
 }
 
-void nvs_store_n_boot(uint16_t value) {
-  nvs_write(&fs, N_BOOT, &value, sizeof(value));
-}
-
-uint16_t nvs_read_n_boot() {
-  uint16_t value;
-  int ret = nvs_read(&fs, N_BOOT, &value, sizeof(value));
-  return (ret < 0) ? 0 : value;
-}
-
 struct ctrl_cmd_configs nvs_read_ctrl_cmd_configs() {
   struct ctrl_cmd_configs cfgs = {0};
   int ret = nvs_read(&fs, CTRL_CMD, &cfgs, sizeof(cfgs));

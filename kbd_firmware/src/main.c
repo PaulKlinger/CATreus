@@ -76,8 +76,6 @@ int main(void) {
   ui_send_startup();
 
   nvs_init();
-  uint16_t n_boot = nvs_read_n_boot();
-  nvs_store_n_boot(n_boot + 1);
 
   int err;
   err = init_bluetooth();
