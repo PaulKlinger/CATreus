@@ -250,6 +250,29 @@ void lcd_puts(const char *s) {
   }
 }
 
+void lcd_putc_invert(char c) {
+  // mapping char
+  c -= ' ';
+  for (uint8_t i = 0; i < sizeof(FONT[0]); i++) {
+    // load bit-pattern from flash
+    displayBuffer[cursorPosition.y][cursorPosition.x + i] = ~FONT[(uint8_t)c][i];
+  }
+  cursorPosition.x += sizeof(FONT[0]);
+}
+
+void lcd_puts_invert(const char *s) {
+  while (*s) {
+    if (*s == '\n') {
+      cursorPosition.x = 0;
+      cursorPosition.y++;
+      lcd_goto_xpix_y(cursorPosition.x, cursorPosition.y);
+    } else {
+      lcd_putc_invert(*s);
+    }
+    s++;
+  }
+}
+
 void lcd_clear_buffer() {
   for (uint8_t i = 0; i < DISPLAY_HEIGHT / 8; i++) {
     memset(displayBuffer[i], 0x00, sizeof(displayBuffer[i]));

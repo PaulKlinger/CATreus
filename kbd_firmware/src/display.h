@@ -13,6 +13,7 @@ extern uint8_t displayBuffer[DISPLAY_HEIGHT / 8][DISPLAY_WIDTH];
 
 void display_init(void);
 void lcd_puts(const char* s);
+void lcd_puts_invert(const char* s);
 void lcd_gotoxy(uint8_t x, uint8_t y);
 void lcd_goto_xpix_y(uint8_t x, uint8_t y);
 void lcd_display(void);

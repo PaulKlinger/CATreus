@@ -42,7 +42,14 @@
 			"string.h": "c",
 			"cmath": "c",
 			"numeric": "c",
-			"xhash": "c"
+			"xhash": "c",
+			"functional": "c",
+			"type_traits": "c",
+			"xlocnum": "c",
+			"xtr1common": "c",
+			"ratio": "c",
+			"tuple": "c",
+			"utility": "c"
 		}
 	}
 }

@@ -25,6 +25,7 @@
 #include "leds.h"
 #include "nvs.h"
 #include "ui.h"
+#include "fuel_gauge/fuel_gauge.h"
 
 void i2c_scanner(const struct device *bus) {
   uint8_t error = 0u;
@@ -83,6 +84,8 @@ int main(void) {
     printk("Bluetooth init failed (err %d)\n", err);
     return 0;
   }
+
+  init_fuel_gauge();
 
   printk("Init key matrix\n");
   init_key_matrix();

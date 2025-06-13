@@ -48,9 +48,12 @@ struct pmic_state get_pmic_state() {
   get_charger_channel(SENSOR_CHAN_GAUGE_VOLTAGE, &val);
   state.battery_voltage = (float)val.val1 + ((float)val.val2) / 1000000.0f;
 
+  get_charger_channel(SENSOR_CHAN_GAUGE_TEMP, &val);
+	state.temp = (float)val.val1 + ((float)val.val2 / 1000000);
+
   get_charger_channel(SENSOR_CHAN_GAUGE_AVG_CURRENT, &val);
   state.battery_current =
-      (float)val.val1 * 1000.f + ((float)val.val2) / 1000.0f;
+      (float)val.val1 + ((float)val.val2) / 1000000.0f;
 
   return state;
 }
