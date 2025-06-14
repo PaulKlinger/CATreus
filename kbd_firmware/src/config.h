@@ -15,7 +15,7 @@
 #define DEEP_SLEEP_NO_PRESSED_TIMEOUT_S 60 * 5
 
 // send state of charge once per minute
-#define BAS_SOC_INTERVAL_S 60 * 5
+#define BAS_SOC_INTERVAL_S 60
 
 struct key_coord {
   uint8_t row;

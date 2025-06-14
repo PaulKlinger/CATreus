@@ -168,7 +168,7 @@ bool show_animation(struct anim_state *state, struct animation *anim,
   if (show_soc) {
     char soc_str[6];
     sprintf(soc_str, "%.0f%%", (double)battery_state.soc);
-    lcd_goto_xpix_y(110, 0);
+    lcd_goto_xpix_y(battery_state.soc >= 99.5f ? 103 : 110, 0);
     lcd_puts_invert(soc_str);
   }
   lcd_display();
