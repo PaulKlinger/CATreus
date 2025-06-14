@@ -14,6 +14,9 @@
 // (to prevent battery drain if something is lying on the keyboard)
 #define DEEP_SLEEP_NO_PRESSED_TIMEOUT_S 60 * 5
 
+// send state of charge once per minute
+#define BAS_SOC_INTERVAL_S 60 * 5
+
 struct key_coord {
   uint8_t row;
   uint8_t col;

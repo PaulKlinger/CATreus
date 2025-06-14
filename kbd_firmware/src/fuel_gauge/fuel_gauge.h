@@ -4,7 +4,7 @@
 int init_fuel_gauge();
 
 struct battery_state {
-    float soc, tte_s, ttf_s;
+  float soc, tte_s, ttf_s;
 };
 
 extern struct battery_state battery_state;

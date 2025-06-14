@@ -255,7 +255,8 @@ void lcd_putc_invert(char c) {
   c -= ' ';
   for (uint8_t i = 0; i < sizeof(FONT[0]); i++) {
     // load bit-pattern from flash
-    displayBuffer[cursorPosition.y][cursorPosition.x + i] = ~FONT[(uint8_t)c][i];
+    displayBuffer[cursorPosition.y][cursorPosition.x + i] =
+        ~FONT[(uint8_t)c][i];
   }
   cursorPosition.x += sizeof(FONT[0]);
 }

@@ -19,7 +19,7 @@ Key layout is hardcoded in the firware, I'm using a NEO2 based layout.
 
 ## Notes
 
-Programmed via the 5 holes on the top next to the leds, using a custom pogo pin connector. 
+Programmed via the 5 holes on the top next to the leds, using a custom pogo pin connector.
 Spacing is 2.54mm, so can just solder pogo pins to a piece of protoboard.
 pinout:
 ```

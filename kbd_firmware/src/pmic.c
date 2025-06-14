@@ -43,17 +43,16 @@ void update_pmic_state() {
   get_charger_channel(SENSOR_CHAN_NPM1300_CHARGER_STATUS, &val);
   pmic_state.charger_status = val.val1;
   pmic_state.is_charging = (pmic_state.charger_status & 0b00011000) !=
-                      0;  // constant current or constant voltage
+                           0;  // constant current or constant voltage
 
   get_charger_channel(SENSOR_CHAN_GAUGE_VOLTAGE, &val);
   pmic_state.battery_voltage = (float)val.val1 + ((float)val.val2) / 1000000.0f;
 
   get_charger_channel(SENSOR_CHAN_GAUGE_TEMP, &val);
-	pmic_state.temp = (float)val.val1 + ((float)val.val2 / 1000000);
+  pmic_state.temp = (float)val.val1 + ((float)val.val2 / 1000000);
 
   get_charger_channel(SENSOR_CHAN_GAUGE_AVG_CURRENT, &val);
-  pmic_state.battery_current =
-      (float)val.val1 + ((float)val.val2) / 1000000.0f;
+  pmic_state.battery_current = (float)val.val1 + ((float)val.val2) / 1000000.0f;
 }
 
 void enter_ship_mode() {
