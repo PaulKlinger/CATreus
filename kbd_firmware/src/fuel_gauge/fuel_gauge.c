@@ -67,7 +67,7 @@ int fuel_gauge_update() {
     float delta;
     int ret;
 
-    struct pmic_state pmic_state = get_pmic_state();
+    update_pmic_state();
 
     ret = nrf_fuel_gauge_ext_state_update(
         pmic_state.vbus_present
@@ -128,7 +128,6 @@ int init_fuel_gauge() {
 
     printk("nRF Fuel Gauge version: %s\n", nrf_fuel_gauge_version);
 
-    struct pmic_state pmic_state = get_pmic_state();
     parameters.v0 = pmic_state.battery_voltage;
     parameters.i0 = pmic_state.battery_current;
     parameters.t0 = pmic_state.temp;

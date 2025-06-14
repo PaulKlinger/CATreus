@@ -7,6 +7,8 @@
 
 #include "key_matrix.h"
 
+struct pmic_state pmic_state;
+
 static const struct device *charger =
     DEVICE_DT_GET(DT_NODELABEL(npm1300_ek_charger));
 
@@ -30,32 +32,28 @@ int get_charger_channel(enum sensor_channel channel, struct sensor_value *val) {
   return ret;
 }
 
-struct pmic_state get_pmic_state() {
-  struct pmic_state state = {0};
-
+void update_pmic_state() {
   struct sensor_value val;
 
   sensor_sample_fetch(charger);
   get_charger_attr(SENSOR_CHAN_NPM1300_CHARGER_VBUS_STATUS,
                    SENSOR_ATTR_NPM1300_CHARGER_VBUS_PRESENT, &val);
-  state.vbus_present = val.val1;
+  pmic_state.vbus_present = val.val1;
 
   get_charger_channel(SENSOR_CHAN_NPM1300_CHARGER_STATUS, &val);
-  state.charger_status = val.val1;
-  state.is_charging = (state.charger_status & 0b00011000) !=
+  pmic_state.charger_status = val.val1;
+  pmic_state.is_charging = (pmic_state.charger_status & 0b00011000) !=
                       0;  // constant current or constant voltage
 
   get_charger_channel(SENSOR_CHAN_GAUGE_VOLTAGE, &val);
-  state.battery_voltage = (float)val.val1 + ((float)val.val2) / 1000000.0f;
+  pmic_state.battery_voltage = (float)val.val1 + ((float)val.val2) / 1000000.0f;
 
   get_charger_channel(SENSOR_CHAN_GAUGE_TEMP, &val);
-	state.temp = (float)val.val1 + ((float)val.val2 / 1000000);
+	pmic_state.temp = (float)val.val1 + ((float)val.val2 / 1000000);
 
   get_charger_channel(SENSOR_CHAN_GAUGE_AVG_CURRENT, &val);
-  state.battery_current =
+  pmic_state.battery_current =
       (float)val.val1 + ((float)val.val2) / 1000000.0f;
-
-  return state;
 }
 
 void enter_ship_mode() {
@@ -70,4 +68,9 @@ void enter_ship_mode() {
   k_msleep(100);
   printk("Should have been asleep 100ms!\n");
   k_sleep(K_FOREVER);
+}
+
+void init_pmic() {
+  pmic_state = (struct pmic_state){0};
+  update_pmic_state();
 }

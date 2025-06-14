@@ -14,8 +14,12 @@ struct pmic_state {
   float temp;
 };
 
-struct pmic_state get_pmic_state();
+extern struct pmic_state pmic_state;
+
+void update_pmic_state();
 
 void enter_ship_mode();
+
+void init_pmic();
 
 #endif  // PMIC_H

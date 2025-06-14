@@ -84,6 +84,7 @@ int main(void) {
     printk("Bluetooth init failed (err %d)\n", err);
     return 0;
   }
+  init_pmic();
 
   init_fuel_gauge();
 

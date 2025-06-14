@@ -195,7 +195,6 @@ bool show_animation(struct anim_state *state, struct animation *anim, bool show_
 // TODO: move to separate files
 
 void show_debug_page(struct ui_message msg, struct ui_state *state) {
-    struct pmic_state pmic_state = get_pmic_state();
     int64_t uptime = k_uptime_get();
     char str[120];
     sprintf(
@@ -203,7 +202,7 @@ void show_debug_page(struct ui_message msg, struct ui_state *state) {
         "usb %d s %d e %d \n %1.0fmA %1.3fV conn: %d\nuptime: %4lldm "
         "%2llds\nks: %d wake: %d\nswap: %d\nsoc: %.2f%%\ntte: %.1fh ttf: %.0fm",
         pmic_state.vbus_present, pmic_state.charger_status,
-        pmic_state.charger_error, (double)pmic_state.battery_current,
+        pmic_state.charger_error, (double)pmic_state.battery_current * 1000,
         (double)pmic_state.battery_voltage, ble_is_connected(), uptime / 60000,
         uptime % 60000 / 1000, current_pressed_keys.n_pressed,
         current_pressed_keys.wake_pressed, ctrl_cmd_swapped, (double)battery_state.soc,
