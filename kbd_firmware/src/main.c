@@ -20,12 +20,13 @@
 
 #include "bluetooth.h"
 #include "config.h"
+#include "fuel_gauge/fuel_gauge.h"
 #include "key_layout.h"
 #include "key_matrix.h"
 #include "leds.h"
 #include "nvs.h"
+#include "pmic.h"
 #include "ui.h"
-#include "fuel_gauge/fuel_gauge.h"
 
 void i2c_scanner(const struct device *bus) {
   uint8_t error = 0u;
@@ -93,6 +94,9 @@ int main(void) {
   uint32_t last_active_time = k_uptime_seconds();
   uint32_t last_no_pressed_time = last_active_time;
 
+  uint32_t last_bas_sent = k_uptime_seconds();
+  send_bas_soc(battery_state.soc);
+
   while (1) {
     uint32_t seconds_since_active = k_uptime_seconds() - last_active_time;
     uint32_t seconds_since_no_pressed =
@@ -138,6 +142,12 @@ int main(void) {
     if (current_pressed_keys.n_pressed == 0 &&
         !current_pressed_keys.wake_pressed) {
       last_no_pressed_time = k_uptime_seconds();
+    }
+
+    if (k_uptime_seconds() - last_bas_sent > BAS_SOC_INTERVAL_S) {
+      last_bas_sent = k_uptime_seconds();
+      send_bas_soc(battery_state.soc);
+      printk("Sent battery SOC %d", (uint8_t)battery_state.soc);
     }
 
     if (current_pressed_keys.n_pressed > 0 ||

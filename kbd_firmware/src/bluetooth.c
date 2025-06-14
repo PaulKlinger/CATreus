@@ -439,3 +439,5 @@ void send_encoded_keys(struct encoded_keys keys) {
                                  report, sizeof(report), NULL);
   printk("HID report sent, ret: %d\n", ret);
 }
+
+void send_bas_soc(float soc) { bt_bas_set_battery_level((uint8_t)soc); }

@@ -23,4 +23,6 @@ struct addr {
 
 struct addr get_current_addr();
 
+void send_bas_soc(float soc);
+
 #endif  // BLUETOOTH_H
